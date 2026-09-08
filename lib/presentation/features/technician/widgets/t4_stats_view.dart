@@ -90,27 +90,47 @@ class _T4StatsViewState extends State<T4StatsView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildPeriodChip('Aujourd\'hui', _periodFilter == 'today', () => setState(() => _periodFilter = 'today')),
-              _buildPeriodChip('7 jours', _periodFilter == '7j', () => setState(() => _periodFilter = '7j')),
-              _buildPeriodChip('Mois en cours', _periodFilter == '30j', () => setState(() => _periodFilter = '30j')),
-              _buildPeriodChip('Personnalisé', _periodFilter == 'custom', () async {
-                setState(() => _periodFilter = 'custom');
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2025),
-                  lastDate: DateTime(2027),
-                );
-                if (picked != null) {
-                  setState(() => _selectedDateRange = picked);
-                }
-              }),
+              _buildPeriodChip(
+                'Aujourd\'hui',
+                _periodFilter == 'today',
+                () => setState(() => _periodFilter = 'today'),
+              ),
+              _buildPeriodChip(
+                '7 jours',
+                _periodFilter == '7j',
+                () => setState(() => _periodFilter = '7j'),
+              ),
+              _buildPeriodChip(
+                'Mois en cours',
+                _periodFilter == '30j',
+                () => setState(() => _periodFilter = '30j'),
+              ),
+              _buildPeriodChip(
+                'Personnalisé',
+                _periodFilter == 'custom',
+                () async {
+                  setState(() => _periodFilter = 'custom');
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2025),
+                    lastDate: DateTime(2027),
+                  );
+                  if (picked != null) {
+                    setState(() => _selectedDateRange = picked);
+                  }
+                },
+              ),
             ],
           ),
           if (_periodFilter == 'custom' && _selectedDateRange != null) ...[
             const SizedBox(height: 6),
             Text(
               'Période : ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}',
-              style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -132,6 +152,9 @@ class _T4StatsViewState extends State<T4StatsView> {
           ),
           const SizedBox(height: 20),
 
+          _buildComparativeTable(),
+          const SizedBox(height: 24),
+
           // 3. Comparative Building list
           const Text('RAPPORTS COMPARATIFS', style: AppTypography.labelSmall),
           const SizedBox(height: 10),
@@ -151,9 +174,19 @@ class _T4StatsViewState extends State<T4StatsView> {
           const SizedBox(height: 20),
 
           // 4. Bar chart
-          const Text('PRODUCTION D\'ŒUFS — HISTORIQUE', style: AppTypography.labelSmall),
+          const Text(
+            'PRODUCTION D\'ŒUFS — HISTORIQUE',
+            style: AppTypography.labelSmall,
+          ),
           const SizedBox(height: 4),
-          const Text('Nombre d\'œufs (Plateaux de 30)', style: TextStyle(fontSize: 11, color: AppColors.inkSoft, fontWeight: FontWeight.w500)),
+          const Text(
+            'Nombre d\'œufs (Plateaux de 30)',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.inkSoft,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 14),
           SizedBox(
             height: 180,
@@ -217,23 +250,42 @@ class _T4StatsViewState extends State<T4StatsView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   'Volailler : $volailler  ·  $activitiesPercent d\'act. faites',
-                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 11),
+                  style: const TextStyle(
+                    color: AppColors.inkSoft,
+                    fontSize: 11,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, size: 12, color: mortalityCount > 10 ? AppColors.danger : AppColors.inkSoft),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 12,
+                      color: mortalityCount > 10
+                          ? AppColors.danger
+                          : AppColors.inkSoft,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '$mortalityCount mort(s) sur la période',
                       style: TextStyle(
-                        color: mortalityCount > 10 ? AppColors.danger : AppColors.inkSoft,
+                        color: mortalityCount > 10
+                            ? AppColors.danger
+                            : AppColors.inkSoft,
                         fontSize: 10.5,
-                        fontWeight: mortalityCount > 10 ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: mortalityCount > 10
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -263,6 +315,244 @@ class _T4StatsViewState extends State<T4StatsView> {
     );
   }
 
+  Widget _buildComparativeTable() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'TABLEAU COMPARATIF DES BÂTIMENTS',
+          style: AppTypography.labelSmall,
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.paper,
+            border: Border.all(color: AppColors.line),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.2),
+                1: FlexColumnWidth(1.2),
+                2: FlexColumnWidth(1.2),
+                3: FlexColumnWidth(1.2),
+                4: FlexColumnWidth(1.4),
+              },
+              border: const TableBorder(
+                horizontalInside: BorderSide(color: AppColors.line, width: 1),
+              ),
+              children: [
+                _buildTableHeaderRow(),
+                _buildTableDataRow(
+                  'Bât. A',
+                  '3 200',
+                  '94%',
+                  '3 morts',
+                  'Excellent',
+                  AppColors.primaryDark,
+                ),
+                _buildTableDataRow(
+                  'Bât. B',
+                  '3 000',
+                  '91%',
+                  '14 morts',
+                  'Stable',
+                  AppColors.primary,
+                ),
+                _buildTableDataRow(
+                  'Bât. C',
+                  '3 100',
+                  '85%',
+                  '20 morts',
+                  'Vigilance',
+                  AppColors.accent,
+                ),
+                _buildTableDataRow(
+                  'Bât. D',
+                  '3 100',
+                  '72%',
+                  '35 morts',
+                  'Critique',
+                  AppColors.danger,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        const Text('RÉSUMÉ ANALYTIQUE', style: AppTypography.labelSmall),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSummaryCard(
+                'Œufs récoltés',
+                _eggsForPeriod(),
+                _periodLabel(),
+                Icons.egg,
+                AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildSummaryCard(
+                'Mortalité totale',
+                _mortalityForPeriod(),
+                _periodLabel(),
+                Icons.warning,
+                AppColors.danger,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  TableRow _buildTableHeaderRow() {
+    return TableRow(
+      decoration: const BoxDecoration(color: Color(0xFFF1F1EB)),
+      children: ['Bâtiment', 'Volailles', 'Taux ponte', 'Mortalité', 'Statut']
+          .map(
+            (label) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  TableRow _buildTableDataRow(
+    String building,
+    String birds,
+    String rate,
+    String mortality,
+    String state,
+    Color color,
+  ) {
+    return TableRow(
+      children: [
+        _buildTableCell(building, bold: true),
+        _buildTableCell(birds),
+        _buildTableCell(rate),
+        _buildTableCell(
+          mortality,
+          color: color == AppColors.danger
+              ? AppColors.danger
+              : AppColors.inkSoft,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              state,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 9,
+                color: color,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableCell(String value, {bool bold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: Text(
+        value,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          color: color ?? AppColors.ink,
+        ),
+      ),
+    );
+  }
+
+  String _periodLabel() => _periodFilter == 'today'
+      ? 'Aujourd’hui'
+      : _periodFilter == '30j'
+      ? 'Mois en cours'
+      : '7 derniers jours';
+  String _eggsForPeriod() => _periodFilter == 'today'
+      ? '9 850'
+      : _periodFilter == '30j'
+      ? '285 400'
+      : '68 950';
+  String _mortalityForPeriod() => _periodFilter == 'today'
+      ? '8 sujets'
+      : _periodFilter == '30j'
+      ? '218 sujets'
+      : '72 sujets';
+
+  Widget _buildSummaryCard(
+    String title,
+    String value,
+    String period,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.inkSoft,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  period,
+                  style: const TextStyle(fontSize: 9, color: AppColors.inkSoft),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPeriodChip(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -270,7 +560,9 @@ class _T4StatsViewState extends State<T4StatsView> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryDark : AppColors.paper,
-          border: Border.all(color: isSelected ? AppColors.primaryDark : AppColors.line),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryDark : AppColors.line,
+          ),
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(
@@ -286,7 +578,9 @@ class _T4StatsViewState extends State<T4StatsView> {
   }
 
   Widget _buildBuildingChip(String label, bool isSelected) {
-    final String targetFilter = label == 'Tous' ? 'Tous' : label.replaceAll('Bât. ', '');
+    final String targetFilter = label == 'Tous'
+        ? 'Tous'
+        : label.replaceAll('Bât. ', '');
     return GestureDetector(
       onTap: () => setState(() => _buildingFilter = targetFilter),
       child: Container(
@@ -294,7 +588,9 @@ class _T4StatsViewState extends State<T4StatsView> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryDark : AppColors.paper,
-          border: Border.all(color: isSelected ? AppColors.primaryDark : AppColors.line),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryDark : AppColors.line,
+          ),
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(
@@ -309,7 +605,12 @@ class _T4StatsViewState extends State<T4StatsView> {
     );
   }
 
-  Widget _buildBar(double heightFactor, String label, bool highlight, {bool isLight = false}) {
+  Widget _buildBar(
+    double heightFactor,
+    String label,
+    bool highlight, {
+    bool isLight = false,
+  }) {
     Color barColor = AppColors.primary;
     if (highlight) barColor = AppColors.accent;
     if (isLight) barColor = AppColors.primaryLight;

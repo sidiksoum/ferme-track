@@ -15,7 +15,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
   // Mortality states
   int _mortalityCount = 3;
   String _mortalityCause = 'heat'; // heat, disease, unknown
-  final TextEditingController _mortalityCommentController = TextEditingController();
+  String _mortalityBuilding = 'Bâtiment A';
+  final TextEditingController _mortalityCommentController =
+      TextEditingController();
 
   // Other anomaly states
   String _anomalyType = 'technical'; // technical, sanitary, security
@@ -108,7 +110,10 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         ),
         const SizedBox(height: 14),
 
-        const Text('COMMENTAIRE / DÉTAILS (REQUIS)', style: AppTypography.label),
+        const Text(
+          'COMMENTAIRE / DÉTAILS (REQUIS)',
+          style: AppTypography.label,
+        ),
         const SizedBox(height: 6),
         AppInputBox(
           placeholder: 'Précisez les symptômes ou circonstances…',
@@ -116,40 +121,20 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         ),
         const SizedBox(height: 14),
 
-        const Text('PHOTO (OPTIONNEL)', style: AppTypography.label),
+        const Text('BÂTIMENT CONCERNÉ', style: AppTypography.label),
         const SizedBox(height: 6),
-        GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Appareil photo activé (simulation)')),
-            );
+        DropdownButtonFormField<String>(
+          value: _mortalityBuilding,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+          items: const ['Bâtiment A', 'Bâtiment B', 'Bâtiment C', 'Bâtiment D']
+              .map(
+                (building) =>
+                    DropdownMenuItem(value: building, child: Text(building)),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) setState(() => _mortalityBuilding = value);
           },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: const Color(0xFFC9D6C6),
-                width: 1.6,
-                style: BorderStyle.solid,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: const [
-                Icon(Icons.camera_alt, size: 20, color: AppColors.inkSoft),
-                SizedBox(height: 6),
-                Text(
-                  'Ajouter une photo (optionnel)',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.inkSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
         const SizedBox(height: 24),
 
@@ -159,12 +144,16 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
             onPressed: () {
               if (_mortalityCommentController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Veuillez ajouter un commentaire explicatif')),
+                  const SnackBar(
+                    content: Text('Veuillez ajouter un commentaire explicatif'),
+                  ),
                 );
                 return;
               }
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Déclaration de mortalité enregistrée')),
+                const SnackBar(
+                  content: Text('Déclaration de mortalité enregistrée'),
+                ),
               );
               setState(() {
                 _mortalityCount = 3;
@@ -224,41 +213,6 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         ),
         const SizedBox(height: 14),
 
-        const Text('PREUVE PHOTO', style: AppTypography.label),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Appareil photo activé (simulation)')),
-            );
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: const Color(0xFFC9D6C6),
-                width: 1.6,
-                style: BorderStyle.solid,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: const [
-                Icon(Icons.camera_alt, size: 20, color: AppColors.inkSoft),
-                SizedBox(height: 6),
-                Text(
-                  'Prendre une photo',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.inkSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
         const SizedBox(height: 24),
 
         SizedBox(
@@ -312,7 +266,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryDark : AppColors.paper,
-          border: Border.all(color: isSelected ? AppColors.primaryDark : AppColors.line),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryDark : AppColors.line,
+          ),
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(

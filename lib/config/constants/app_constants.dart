@@ -6,7 +6,7 @@ class AppConstants {
   static const String farmName = 'Ferme Akoupé';
 
   // API Configuration
-  static const String baseUrl = 'https://api.ferme-track.local/v1';
+  static const String baseUrl = 'https://api-ferme-track.onrender.com/api/v1';
   static const Duration connectionTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
 

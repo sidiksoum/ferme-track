@@ -27,12 +27,18 @@ class UserRemoteDto {
   });
 
   User toEntity() {
+    String mappedRole = role;
+    if (role == 'director') mappedRole = 'directeur';
+    if (role == 'technician') mappedRole = 'technicien';
+    if (role == 'warehouse') mappedRole = 'magasinier';
+    if (role == 'poultrykeeper') mappedRole = 'volailler';
+
     return User(
       id: id,
       username: username,
       email: email,
       fullName: fullName,
-      role: role,
+      role: mappedRole,
       farmId: farmId,
       avatarUrl: avatarUrl,
       isActive: isActive,

@@ -69,7 +69,13 @@ class AuthNotifier extends ChangeNotifier {
       final result = await _authRepository.login(username, password);
       return result.fold(
         (exception) {
-          _error = exception.message;
+          if (exception.message.toLowerCase().contains('offline') || 
+              exception.message.toLowerCase().contains('timeout') || 
+              exception.message.toLowerCase().contains('connection')) {
+            _error = 'Pas de connexion Internet.';
+          } else {
+            _error = 'Échec : Identifiant ou mot de passe incorrect';
+          }
           _isLoading = false;
           notifyListeners();
           return false;

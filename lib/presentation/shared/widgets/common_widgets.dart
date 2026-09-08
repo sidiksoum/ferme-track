@@ -2,6 +2,79 @@ import 'package:flutter/material.dart';
 
 import '../../../config/theme/app_theme.dart';
 
+Future<void> showActionLoadingDialog(
+  BuildContext context, {
+  required String message,
+}) {
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return Dialog(
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              const SizedBox(width: 18),
+              Flexible(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<bool> showLogoutConfirmationDialog(
+  BuildContext context, [
+  VoidCallback? onConfirm,
+]) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      );
+    },
+  );
+
+  final confirmed = result ?? false;
+  if (confirmed && onConfirm != null) {
+    onConfirm();
+  }
+
+  return confirmed;
+}
+
 /// KPI Card Widget
 class KpiCard extends StatelessWidget {
   final IconData icon;
@@ -104,13 +177,13 @@ class AlertRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 5,
-                  color: colors['border'],
-                ),
+                Container(width: 5, color: colors['border']),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -303,7 +376,19 @@ class TaskCard extends StatelessWidget {
           'icon': AppColors.statusDone,
           'text': AppColors.statusDone,
         };
+      case TaskStatus.pendingValidation:
+        return {
+          'background': AppColors.warningLight,
+          'icon': AppColors.warning,
+          'text': AppColors.warning,
+        };
       case TaskStatus.todo:
+        return {
+          'background': AppColors.warningLight,
+          'icon': AppColors.warning,
+          'text': AppColors.statusTodo,
+        };
+      case TaskStatus.inProgress:
         return {
           'background': AppColors.warningLight,
           'icon': AppColors.warning,
@@ -328,8 +413,12 @@ class TaskCard extends StatelessWidget {
     switch (status) {
       case TaskStatus.done:
         return 'Faite';
+      case TaskStatus.pendingValidation:
+        return 'A valider';
       case TaskStatus.todo:
         return 'À faire';
+      case TaskStatus.inProgress:
+        return 'En cours';
       case TaskStatus.late:
         return 'Retard';
       case TaskStatus.partial:
@@ -338,7 +427,7 @@ class TaskCard extends StatelessWidget {
   }
 }
 
-enum TaskStatus { done, todo, late, partial }
+enum TaskStatus { done, todo, inProgress, late, partial, pendingValidation }
 
 /// Input Box Widget
 class AppInputBox extends StatelessWidget {
@@ -352,6 +441,7 @@ class AppInputBox extends StatelessWidget {
   final VoidCallback? onTap;
   final String? Function(String?)? validator;
   final void Function(String)? onChanged;
+  final bool obscureText;
 
   const AppInputBox({
     super.key,
@@ -365,6 +455,7 @@ class AppInputBox extends StatelessWidget {
     this.onTap,
     this.validator,
     this.onChanged,
+    this.obscureText = false,
   });
 
   @override
@@ -403,6 +494,7 @@ class AppInputBox extends StatelessWidget {
                     maxLines: maxLines,
                     readOnly: readOnly,
                     onChanged: onChanged,
+                    obscureText: obscureText,
                     decoration: InputDecoration(
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -412,7 +504,10 @@ class AppInputBox extends StatelessWidget {
                       focusedErrorBorder: InputBorder.none,
                       filled: false,
                       hintText: placeholder,
-                      hintStyle: const TextStyle(color: AppColors.inkSoft, fontSize: 16.5),
+                      hintStyle: const TextStyle(
+                        color: AppColors.inkSoft,
+                        fontSize: 16.5,
+                      ),
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -422,10 +517,7 @@ class AppInputBox extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (suffix != null) ...[
-                  const SizedBox(width: 10),
-                  suffix!,
-                ],
+                if (suffix != null) ...[const SizedBox(width: 10), suffix!],
               ],
             ),
           ),
@@ -454,11 +546,19 @@ class CounterBox extends StatefulWidget {
 
 class _CounterBoxState extends State<CounterBox> {
   late int _value;
+  late final TextEditingController _controller;
 
   @override
   void initState() {
     super.initState();
     _value = widget.initialValue;
+    _controller = TextEditingController(text: _value.toString());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -474,7 +574,13 @@ class _CounterBoxState extends State<CounterBox> {
         children: [
           GestureDetector(
             onTap: () {
-              setState(() => _value = (_value - 1).clamp(0, double.infinity).toInt());
+              setState(() {
+                _value = (_value - 1).clamp(0, double.infinity).toInt();
+                _controller.text = _value.toString();
+                _controller.selection = TextSelection.collapsed(
+                  offset: _controller.text.length,
+                );
+              });
               widget.onChanged?.call(_value);
             },
             child: Container(
@@ -484,36 +590,61 @@ class _CounterBoxState extends State<CounterBox> {
                 color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.remove, color: AppColors.primaryDark, size: 22),
+              child: const Icon(
+                Icons.remove,
+                color: AppColors.primaryDark,
+                size: 22,
+              ),
             ),
           ),
           Expanded(
-            child: Column(
-              children: [
-                Text(
-                  _value.toString(),
-                  style: const TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.ink,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (widget.unit != null)
-                  Text(
-                    widget.unit!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.inkSoft,
-                    ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 120),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _controller,
                     textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    onChanged: (value) {
+                      final parsed = int.tryParse(value);
+                      if (parsed != null && parsed >= 0) {
+                        _value = parsed;
+                        widget.onChanged?.call(_value);
+                      }
+                    },
                   ),
-              ],
+                  if (widget.unit != null)
+                    Text(
+                      widget.unit!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.inkSoft,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                ],
+              ),
             ),
           ),
           GestureDetector(
             onTap: () {
-              setState(() => _value++);
+              setState(() {
+                _value++;
+                _controller.text = _value.toString();
+                _controller.selection = TextSelection.collapsed(
+                  offset: _controller.text.length,
+                );
+              });
               widget.onChanged?.call(_value);
             },
             child: Container(
@@ -523,7 +654,11 @@ class _CounterBoxState extends State<CounterBox> {
                 color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.add, color: AppColors.primaryDark, size: 22),
+              child: const Icon(
+                Icons.add,
+                color: AppColors.primaryDark,
+                size: 22,
+              ),
             ),
           ),
         ],

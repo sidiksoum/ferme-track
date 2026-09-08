@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/v1_tasks_view.dart';
@@ -66,8 +70,26 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Se déconnecter',
-            onPressed: () async {
-              await authNotifier.logout();
+            onPressed: () {
+              showLogoutConfirmationDialog(context, () async {
+                if (!mounted) return;
+                showActionLoadingDialog(
+                  context,
+                  message: 'Déconnexion en cours...',
+                );
+                final success = await authNotifier.logout();
+                if (!mounted) return;
+                Navigator.of(context, rootNavigator: true).pop();
+                if (!success && authNotifier.error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        authNotifier.error ?? 'Déconnexion impossible.',
+                      ),
+                    ),
+                  );
+                }
+              });
             },
           ),
         ],
@@ -89,10 +111,7 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
             icon: Icon(Icons.assignment),
             label: 'Tâches',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.warning),
-            label: 'Anomalie',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.warning), label: 'Anomalie'),
           BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Historique',
@@ -142,7 +161,12 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
       case 0:
         return V1TasksView(
           onSelectTask: (task) {
-            _showCloseTaskDialog(context, task);
+            if (task['status'] == TaskStatus.done ||
+                task['status'] == TaskStatus.pendingValidation) {
+              _showTaskDetails(context, task);
+              return Future.value(false);
+            }
+            return _showCloseTaskDialog(context, task);
           },
         );
       case 1:
@@ -152,7 +176,12 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
       default:
         return V1TasksView(
           onSelectTask: (task) {
-            _showCloseTaskDialog(context, task);
+            if (task['status'] == TaskStatus.done ||
+                task['status'] == TaskStatus.pendingValidation) {
+              _showTaskDetails(context, task);
+              return Future.value(false);
+            }
+            return _showCloseTaskDialog(context, task);
           },
         );
     }
@@ -182,7 +211,10 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Type : ${item['title']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          'Type : ${item['title']}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(height: 8),
                         Text('Date : ${item['date']}'),
                         const SizedBox(height: 8),
@@ -211,7 +243,11 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                       color: AppColors.errorLight,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.warning, color: AppColors.danger, size: 16),
+                    child: const Icon(
+                      Icons.warning,
+                      color: AppColors.danger,
+                      size: 16,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -220,18 +256,27 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                       children: [
                         Text(
                           item['title'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                          ),
                         ),
                         Text(
                           item['meta'] as String,
-                          style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
+                          style: const TextStyle(
+                            color: AppColors.inkSoft,
+                            fontSize: 11.5,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     item['date'] as String,
-                    style: const TextStyle(fontSize: 10, color: AppColors.inkSoft),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.inkSoft,
+                    ),
                   ),
                 ],
               ),
@@ -242,37 +287,165 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
     );
   }
 
-  void _showCloseTaskDialog(BuildContext context, Map<String, dynamic> task) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Clôturer la tâche', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(dialogContext),
+  Future<bool> _showCloseTaskDialog(
+    BuildContext context,
+    Map<String, dynamic> task,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: true,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Clôturer la tâche',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(dialogContext),
+                  ),
+                ],
               ),
+              content: Container(
+                width: double.maxFinite,
+                child: V2CloseTaskView(
+                  selectedTask: task,
+                  onCancel: () => Navigator.pop(dialogContext),
+                  onDone: (payload) async {
+                    final success = await _closeTask(task, payload);
+                    if (success && dialogContext.mounted) {
+                      Navigator.pop(dialogContext, true);
+                    }
+                  },
+                ),
+              ),
+            );
+          },
+        ) ??
+        false;
+  }
+
+  void _showTaskDetails(BuildContext context, Map<String, dynamic> task) {
+    String formatDateTime(dynamic value) {
+      final parsed = DateTime.tryParse(value?.toString() ?? '');
+      if (parsed == null) return 'Non renseignée';
+      return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year} à ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+    }
+
+    String formatNotes(dynamic value) {
+      if (value == null || value.toString().trim().isEmpty)
+        return 'Aucune information';
+      try {
+        final decoded = jsonDecode(value.toString());
+        if (decoded is Map) {
+          final lines = <String>[];
+          if (decoded['feedQtyKg'] != null)
+            lines.add('Quantité distribuée : ${decoded['feedQtyKg']} kg');
+          if (decoded['eggsProduced'] != null)
+            lines.add('Œufs produits : ${decoded['eggsProduced']}');
+          if (decoded['eggsBroken'] != null)
+            lines.add('Œufs cassés : ${decoded['eggsBroken']}');
+          if (decoded['eggsUnsellable'] != null)
+            lines.add('Œufs non vendables : ${decoded['eggsUnsellable']}');
+          if (decoded['eggsPlusGros'] != null)
+            lines.add('Œufs plus gros : ${decoded['eggsPlusGros']}');
+          if (decoded['eggsGros'] != null)
+            lines.add('Œufs gros : ${decoded['eggsGros']}');
+          if (decoded['eggsMoyen'] != null)
+            lines.add('Œufs moyens : ${decoded['eggsMoyen']}');
+          if (decoded['eggsPetit'] != null)
+            lines.add('Œufs petits : ${decoded['eggsPetit']}');
+          if (decoded['temperatureCelsius'] != null)
+            lines.add(
+              'Température constatée : ${decoded['temperatureCelsius']} °C',
+            );
+          if (decoded['notes'] != null &&
+              decoded['notes'].toString().trim().isNotEmpty)
+            lines.add('Observation : ${decoded['notes']}');
+          if (decoded['confirmed'] == true)
+            lines.add('Confirmation : tâche réalisée');
+          return lines.join('\n');
+        }
+      } catch (_) {}
+      return value.toString();
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(task['title'] as String),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Programmée le : ${formatDateTime(task['scheduledDate'])}'),
+              Text(
+                'Responsable : ${task['responsibleName'] ?? 'Non renseigné'}',
+              ),
+              Text('Bâtiment : ${task['buildingName'] ?? 'Non renseigné'}'),
+              Text(
+                'Heure de programmation : ${task['startTime'] ?? 'Non renseignée'}',
+              ),
+              Text(
+                'Heure de fin prévue : ${task['endTime'] ?? 'Non renseignée'}',
+              ),
+              Text('Soumise le : ${formatDateTime(task['submittedAt'])}'),
+              Text('Validée le : ${formatDateTime(task['completedAt'])}'),
+              const SizedBox(height: 12),
+              Text('Instructions : ${task['description'] ?? 'Aucun détail'}'),
+              if (task['submittedNotes'] != null)
+                Text('Compte rendu :\n${formatNotes(task['submittedNotes'])}'),
+              if (task['validationNotes'] != null)
+                Text(
+                  'Validation technicien :\n${formatNotes(task['validationNotes'])}',
+                ),
             ],
           ),
-          content: Container(
-            width: double.maxFinite,
-            child: V2CloseTaskView(
-              selectedTask: task,
-              onCancel: () => Navigator.pop(dialogContext),
-              onDone: () {
-                Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tâche clôturée avec succès !')),
-                );
-              },
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fermer'),
           ),
-        );
-      },
+        ],
+      ),
     );
+  }
+
+  Future<bool> _closeTask(
+    Map<String, dynamic> task,
+    Map<String, dynamic> payload,
+  ) async {
+    final taskId = task['id']?.toString();
+    if (taskId == null || taskId.isEmpty) return false;
+    showActionLoadingDialog(
+      context,
+      message: 'Enregistrement de la clôture...',
+    );
+    try {
+      await getIt<ApiClient>().patch(
+        '/volailler/tasks/$taskId/close',
+        data: payload,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tâche clôturée avec succès !')),
+        );
+      }
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Clôture impossible : $error')));
+      }
+      return false;
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 }

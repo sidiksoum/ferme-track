@@ -30,14 +30,14 @@ class ApiClient {
   }
 
   /// GET request
-  Future<Map<String, dynamic>> get(
+  Future<dynamic> get(
     String endpoint, {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
     try {
       AppLogger.debug('GET: $endpoint');
-      final response = await _dio.get<Map<String, dynamic>>(
+      final response = await _dio.get<dynamic>(
         endpoint,
         queryParameters: queryParameters,
         options: options,
@@ -49,7 +49,7 @@ class ApiClient {
   }
 
   /// POST request
-  Future<Map<String, dynamic>> post(
+  Future<dynamic> post(
     String endpoint, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -57,7 +57,7 @@ class ApiClient {
   }) async {
     try {
       AppLogger.debug('POST: $endpoint');
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _dio.post<dynamic>(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -70,7 +70,7 @@ class ApiClient {
   }
 
   /// PUT request
-  Future<Map<String, dynamic>> put(
+  Future<dynamic> put(
     String endpoint, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -78,7 +78,7 @@ class ApiClient {
   }) async {
     try {
       AppLogger.debug('PUT: $endpoint');
-      final response = await _dio.put<Map<String, dynamic>>(
+      final response = await _dio.put<dynamic>(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -91,7 +91,7 @@ class ApiClient {
   }
 
   /// PATCH request
-  Future<Map<String, dynamic>> patch(
+  Future<dynamic> patch(
     String endpoint, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -99,7 +99,7 @@ class ApiClient {
   }) async {
     try {
       AppLogger.debug('PATCH: $endpoint');
-      final response = await _dio.patch<Map<String, dynamic>>(
+      final response = await _dio.patch<dynamic>(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -112,7 +112,7 @@ class ApiClient {
   }
 
   /// DELETE request
-  Future<Map<String, dynamic>> delete(
+  Future<dynamic> delete(
     String endpoint, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -120,7 +120,7 @@ class ApiClient {
   }) async {
     try {
       AppLogger.debug('DELETE: $endpoint');
-      final response = await _dio.delete<Map<String, dynamic>>(
+      final response = await _dio.delete<dynamic>(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -151,7 +151,7 @@ class ApiClient {
   }
 
   /// Upload file
-  Future<Map<String, dynamic>> uploadFile(
+  Future<dynamic> uploadFile(
     String endpoint,
     String filePath, {
     String fieldName = 'file',
@@ -165,7 +165,7 @@ class ApiClient {
         ...?additionalData,
       });
 
-      final response = await _dio.post<Map<String, dynamic>>(
+      final response = await _dio.post<dynamic>(
         endpoint,
         data: formData,
         onSendProgress: onSendProgress,
@@ -177,7 +177,7 @@ class ApiClient {
   }
 
   /// Handle successful response
-  Map<String, dynamic> _handleResponse(Response<Map<String, dynamic>> response) {
+  dynamic _handleResponse(Response<dynamic> response) {
     if (response.statusCode == null || response.statusCode! < 200 || response.statusCode! >= 300) {
       throw ServerException(
         message: 'Server error',
@@ -185,7 +185,7 @@ class ApiClient {
         response: response.data,
       );
     }
-    return response.data ?? {};
+    return response.data;
   }
 
   /// Handle error response
@@ -203,15 +203,31 @@ class ApiClient {
 
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
-        final response = error.response?.data as Map<String, dynamic>?;
-        final message = response?['message'] ?? response?['error'] ?? 'Server error';
+        final response = error.response?.data;
+        String message = 'Server error';
+        if (response is Map<String, dynamic>) {
+          final msg = response['message'];
+          final err = response['error'];
+          final detail = response['detail'];
+          if (msg is String) {
+            message = msg;
+          } else if (err is String) {
+            message = err;
+          } else if (detail is String) {
+            message = detail;
+          } else if (detail != null) {
+            message = detail.toString();
+          }
+        } else if (response is String) {
+          message = response;
+        }
 
         switch (statusCode) {
           case 400:
             return ServerException(
               message: message,
               statusCode: statusCode,
-              response: response,
+              response: response is Map<String, dynamic> ? response : null,
             );
           case 401:
             return UnauthorizedException(
@@ -237,7 +253,7 @@ class ApiClient {
             return ServerException(
               message: message,
               statusCode: statusCode,
-              response: response,
+              response: response is Map<String, dynamic> ? response : null,
             );
         }
 

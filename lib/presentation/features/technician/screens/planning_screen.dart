@@ -8,6 +8,7 @@ import '../widgets/t1_accueil_view.dart';
 import '../widgets/t2_activities_orders_view.dart';
 import '../widgets/t3_stock_view.dart';
 import '../widgets/t4_stats_view.dart';
+import '../widgets/t5_gestion_view.dart';
 
 /// Technician main screen combining planning, operations and stocks
 class PlanningScreen extends StatefulWidget {
@@ -105,7 +106,19 @@ class _PlanningScreenState extends State<PlanningScreen> {
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Se déconnecter',
             onPressed: () async {
-              await authNotifier.logout();
+              final shouldLogout = await showLogoutConfirmationDialog(context);
+              if (!shouldLogout || !mounted) return;
+
+              showActionLoadingDialog(context, message: 'Déconnexion en cours...');
+              final success = await authNotifier.logout();
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pop();
+
+              if (!success && authNotifier.error != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(authNotifier.error ?? 'Déconnexion impossible.')),
+                );
+              }
             },
           ),
         ],
@@ -131,6 +144,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
             label: 'Stocks',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Stats'),
+          BottomNavigationBarItem(icon: Icon(Icons.business), label: 'Gestion'),
         ],
       ),
     );
@@ -146,6 +160,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
         return 'Stock Aliments & Médicaments';
       case 3:
         return 'Statistiques de Production';
+      case 4:
+        return 'Gestion des Bâtiments';
       default:
         return 'Tableau de bord';
     }
@@ -161,6 +177,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
         return 'Suivi des approvisionnements';
       case 3:
         return 'Rendements & ponte hebdomadaire';
+      case 4:
+        return 'Bâtiments, lots et affectation';
       default:
         return 'Ferme Akoupé';
     }
@@ -185,6 +203,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
         return const T3StockView();
       case 3:
         return const T4StatsView();
+      case 4:
+        return const T5GestionView();
       default:
         return T1AccueilView(
           onViewNotifications: () {

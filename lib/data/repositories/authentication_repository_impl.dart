@@ -29,43 +29,6 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
     String password,
   ) async {
     try {
-      final normalizedUsername = username.trim().toLowerCase();
-      final mockRoles = {
-        'directeur': AppConstants.roleDirector,
-        'technicien': AppConstants.roleTechnician,
-        'volailler': AppConstants.rolePoultryKeeper,
-        'magasinier': AppConstants.roleWarehouseManager,
-      };
-
-      if (mockRoles.containsKey(normalizedUsername)) {
-        final role = mockRoles[normalizedUsername]!;
-        final user = User(
-          id: 'mock_id_$normalizedUsername',
-          username: normalizedUsername,
-          email: '$normalizedUsername@fermetrack.com',
-          fullName: normalizedUsername == 'directeur'
-              ? 'Koffi'
-              : (normalizedUsername == 'volailler' ? 'Ama Koffi' : 'Utilisateur Mock'),
-          role: role,
-          farmId: 'farm_akoupe_1',
-          isActive: true,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-
-        final authResponse = AuthResponse(
-          user: user,
-          accessToken: 'mock_token_$normalizedUsername',
-          refreshToken: 'mock_refresh_token_$normalizedUsername',
-          expiresAt: DateTime.now().add(const Duration(days: 30)),
-        );
-
-        await _saveSession(authResponse);
-        _apiClient.setAuthToken(authResponse.accessToken);
-        
-        AppLogger.info('Mock user logged in successfully: ${user.username}');
-        return Right(authResponse);
-      }
 
       if (!await _networkChecker.hasConnection) {
         return Left(
@@ -75,10 +38,12 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
         );
       }
 
+      final normalizedUsername = username.trim().toLowerCase();
+
       final response = await _apiClient.post(
         '/auth/login',
         data: {
-          'username': username,
+          'username': normalizedUsername,
           'password': password,
         },
       );
@@ -112,7 +77,15 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
       // Call logout endpoint if connection available
       if (await _networkChecker.hasConnection) {
         try {
-          await _apiClient.post('/auth/logout');
+          final refreshToken = await _localStorage.getString('refresh_token');
+          if (refreshToken != null) {
+            await _apiClient.post(
+              '/auth/logout',
+              data: {
+                'refreshToken': refreshToken,
+              },
+            );
+          }
         } catch (e) {
           AppLogger.warning('Logout endpoint error: $e');
         }
@@ -137,7 +110,11 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
   Future<Either<AppException, bool>> isLoggedIn() async {
     try {
       final session = await _getStoredSession();
-      return Right(session != null && session.isValid);
+      final loggedIn = session != null && session.isValid;
+      if (loggedIn) {
+        _apiClient.setAuthToken(session.accessToken);
+      }
+      return Right(loggedIn);
     } catch (e, stackTrace) {
       AppLogger.error('Error checking login status', e, stackTrace);
       return Left(UnknownException(
@@ -171,7 +148,21 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
         );
       }
 
-      final response = await _apiClient.post('/auth/refresh-token');
+      final refreshToken = await _localStorage.getString('refresh_token');
+      if (refreshToken == null) {
+        return Left(
+          AuthenticationException(
+            message: 'Session expirée, veuillez vous reconnecter.',
+          ),
+        );
+      }
+
+      final response = await _apiClient.post(
+        '/auth/refresh',
+        data: {
+          'refreshToken': refreshToken,
+        },
+      );
       final authDto = AuthResponseRemoteDto.fromMap(response);
       final authEntity = authDto.toEntity();
 
@@ -182,12 +173,10 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
       AppLogger.info('Token refreshed successfully');
       return Right(authEntity);
     } on AppException catch (e) {
-      if (e is UnauthorizedException) {
-        await logout();
-      }
+      AppLogger.error('Token refresh error: ${e.message}');
       return Left(e);
     } catch (e, stackTrace) {
-      AppLogger.error('Token refresh error', e, stackTrace);
+      AppLogger.error('Unexpected error during token refresh', e, stackTrace);
       return Left(UnknownException(
         message: 'Token refresh failed',
         stackTrace: stackTrace,

@@ -5,7 +5,7 @@ import '../../../shared/widgets/common_widgets.dart';
 class V2CloseTaskView extends StatefulWidget {
   final Map<String, dynamic>? selectedTask;
   final VoidCallback onCancel;
-  final VoidCallback onDone;
+  final Future<void> Function(Map<String, dynamic> payload) onDone;
 
   const V2CloseTaskView({
     super.key,
@@ -23,11 +23,15 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
   int _feedQty = 75;
 
   // Egg collection states
-  int _eggsProduced = 1640;
-  int _eggsBroken = 18;
-  int _eggsUnsellable = 6;
+  int _eggsPlusGros = 120;
+  int _eggsGros = 420;
+  int _eggsMoyen = 760;
+  int _eggsPetit = 340;
   final TextEditingController _eggObservationController =
       TextEditingController();
+  final TextEditingController _generalObservationController =
+      TextEditingController();
+  final Map<String, TextEditingController> _eggFormatControllers = {};
 
   // Cleaning states
   bool _cleaningConfirmed = false;
@@ -38,11 +42,15 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
   @override
   void dispose() {
     _eggObservationController.dispose();
+    _generalObservationController.dispose();
+    for (final controller in _eggFormatControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   int get _totalCollectedEggs {
-    return _eggsProduced + _eggsBroken + _eggsUnsellable;
+    return _eggsPlusGros + _eggsGros + _eggsMoyen + _eggsPetit;
   }
 
   @override
@@ -55,6 +63,8 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
         };
 
     final title = task['title'] as String;
+    final taskType = (task['taskType'] as String? ?? '').toLowerCase();
+    final typeOrTitle = taskType.isEmpty ? title.toLowerCase() : taskType;
 
     return SingleChildScrollView(
       child: Column(
@@ -98,16 +108,17 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
           const SizedBox(height: 20),
 
           // Render specific form based on task type
-          if (title.toLowerCase().contains('aliment'))
+          if (typeOrTitle == 'feeding' || typeOrTitle.contains('aliment'))
             _buildFeedDistributionForm()
-          else if (title.toLowerCase().contains('œufs') ||
-              title.toLowerCase().contains('oeufs'))
+          else if (typeOrTitle == 'egg_collection' ||
+              typeOrTitle.contains('œuf') ||
+              typeOrTitle.contains('oeuf'))
             _buildEggCollectionForm()
-          else if (title.toLowerCase().contains('nettoyage') ||
-              title.toLowerCase().contains('abreuvoir'))
+          else if (typeOrTitle == 'cleaning' || typeOrTitle.contains('nettoy'))
             _buildCleaningForm()
-          else if (title.toLowerCase().contains('température') ||
-              title.toLowerCase().contains('temperature'))
+          else if (typeOrTitle == 'inspection' ||
+              typeOrTitle.contains('température') ||
+              typeOrTitle.contains('temperature'))
             _buildTemperatureForm()
           else
             _buildDefaultCloseForm(),
@@ -152,13 +163,8 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Tâche clôturée : $_feedQty kg distribués'),
-                    ),
-                  );
-                  widget.onDone();
+                onPressed: () async {
+                  await widget.onDone({'feedQtyKg': _feedQty.toDouble()});
                 },
                 child: const Text('Confirmer'),
               ),
@@ -205,16 +211,26 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
         const Text('COLLECTE D\'ŒUFS', style: AppTypography.label),
         const SizedBox(height: 8),
         _buildFormatCounter(
-          'Produits',
-          _eggsProduced,
-          (val) => setState(() => _eggsProduced = val),
+          'Plus gros',
+          _eggsPlusGros,
+          (val) => setState(() => _eggsPlusGros = val),
         ),
         _buildFormatCounter(
-          'Cassés',
-          _eggsBroken,
-          (val) => setState(() => _eggsBroken = val),
+          'Gros',
+          _eggsGros,
+          (val) => setState(() => _eggsGros = val),
         ),
-        const SizedBox(height: 12),
+        _buildFormatCounter(
+          'Moyen',
+          _eggsMoyen,
+          (val) => setState(() => _eggsMoyen = val),
+        ),
+        _buildFormatCounter(
+          'Petit',
+          _eggsPetit,
+          (val) => setState(() => _eggsPetit = val),
+        ),
+        const SizedBox(height: 10),
 
         Container(
           width: double.infinity,
@@ -265,15 +281,14 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Collecte enregistrée : $_totalCollectedEggs œufs',
-                      ),
-                    ),
-                  );
-                  widget.onDone();
+                onPressed: () async {
+                  await widget.onDone({
+                    'eggsPlusGros': _eggsPlusGros,
+                    'eggsGros': _eggsGros,
+                    'eggsMoyen': _eggsMoyen,
+                    'eggsPetit': _eggsPetit,
+                    'notes': _eggObservationController.text.trim(),
+                  });
                 },
                 child: const Text('Enregistrer'),
               ),
@@ -331,15 +346,8 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
               child: ElevatedButton(
                 onPressed: !_cleaningConfirmed
                     ? null
-                    : () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Tâche de nettoyage enregistrée et fermée',
-                            ),
-                          ),
-                        );
-                        widget.onDone();
+                    : () async {
+                        await widget.onDone({'confirmed': true});
                       },
                 child: const Text('Confirmer'),
               ),
@@ -374,15 +382,10 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Température enregistrée : $_temperatureVal °C',
-                      ),
-                    ),
-                  );
-                  widget.onDone();
+                onPressed: () async {
+                  await widget.onDone({
+                    'temperatureCelsius': _temperatureVal.toDouble(),
+                  });
                 },
                 child: const Text('Confirmer'),
               ),
@@ -398,9 +401,12 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Confirmer la réalisation de cette tâche ?',
-          style: AppTypography.label,
+        const Text('DÉTAILS DE RÉALISATION', style: AppTypography.label),
+        const SizedBox(height: 6),
+        AppInputBox(
+          placeholder: 'Produit, dose, observation ou résultat…',
+          controller: _generalObservationController,
+          maxLines: 3,
         ),
         const SizedBox(height: 24),
         Row(
@@ -414,11 +420,11 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tâche clôturée')),
-                  );
-                  widget.onDone();
+                onPressed: () async {
+                  await widget.onDone({
+                    'confirmed': true,
+                    'notes': _generalObservationController.text.trim(),
+                  });
                 },
                 child: const Text('Confirmer'),
               ),
@@ -430,6 +436,13 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
   }
 
   Widget _buildFormatCounter(String label, int value, Function(int) onChanged) {
+    final controller = _eggFormatControllers.putIfAbsent(
+      label,
+      () => TextEditingController(text: value.toString()),
+    );
+    if (controller.text != value.toString() && !controller.selection.isValid) {
+      controller.text = value.toString();
+    }
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       margin: const EdgeInsets.only(bottom: 8),
@@ -445,7 +458,14 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
           Row(
             children: [
               GestureDetector(
-                onTap: () => onChanged((value - 1).clamp(0, 5000)),
+                onTap: () {
+                  final next = (value - 1).clamp(0, 5000);
+                  controller.text = next.toString();
+                  controller.selection = TextSelection.collapsed(
+                    offset: controller.text.length,
+                  );
+                  onChanged(next);
+                },
                 child: Container(
                   width: 24,
                   height: 24,
@@ -464,13 +484,32 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                '$value',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              SizedBox(
+                width: 80,
+                child: TextField(
+                  controller: controller,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onChanged: (input) {
+                    final parsed = int.tryParse(input);
+                    if (parsed != null && parsed >= 0) onChanged(parsed);
+                  },
+                ),
               ),
               const SizedBox(width: 12),
               GestureDetector(
-                onTap: () => onChanged((value + 1).clamp(0, 5000)),
+                onTap: () {
+                  final next = (value + 1).clamp(0, 5000);
+                  controller.text = next.toString();
+                  controller.selection = TextSelection.collapsed(
+                    offset: controller.text.length,
+                  );
+                  onChanged(next);
+                },
                 child: Container(
                   width: 24,
                   height: 24,

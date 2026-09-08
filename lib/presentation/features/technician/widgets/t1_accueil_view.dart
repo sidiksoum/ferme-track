@@ -5,10 +5,7 @@ import '../../../shared/widgets/common_widgets.dart';
 class T1AccueilView extends StatelessWidget {
   final VoidCallback onViewNotifications;
 
-  const T1AccueilView({
-    super.key,
-    required this.onViewNotifications,
-  });
+  const T1AccueilView({super.key, required this.onViewNotifications});
 
   @override
   Widget build(BuildContext context) {
@@ -83,14 +80,22 @@ class T1AccueilView extends StatelessWidget {
             title: 'Rupture de stock',
             subtitle: 'Aliment démarrage sous le seuil',
             type: AlertType.error,
-            onTap: onViewNotifications,
+            onTap: () => _showAlertDetails(
+              context,
+              'Rupture de stock',
+              'L’aliment démarrage est sous le seuil de sécurité. Vérifiez le stock magasin et planifiez un réapprovisionnement.',
+            ),
           ),
           const SizedBox(height: 8),
           AlertRow(
             title: 'Échéance de paiement',
             subtitle: 'Seydou Yao — 65 000 FCFA, en retard',
             type: AlertType.warning,
-            onTap: onViewNotifications,
+            onTap: () => _showAlertDetails(
+              context,
+              'Échéance de paiement',
+              'Seydou Yao doit encore 65 000 FCFA. L’échéance est dépassée et nécessite un suivi commercial.',
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -98,7 +103,11 @@ class T1AccueilView extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: onViewNotifications,
-              icon: const Icon(Icons.arrow_forward, size: 14, color: AppColors.primary),
+              icon: const Icon(
+                Icons.arrow_forward,
+                size: 14,
+                color: AppColors.primary,
+              ),
               label: const Text(
                 'Voir toutes les notifications →',
                 style: TextStyle(
@@ -108,6 +117,22 @@ class T1AccueilView extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAlertDetails(BuildContext context, String title, String details) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(details),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fermer'),
           ),
         ],
       ),

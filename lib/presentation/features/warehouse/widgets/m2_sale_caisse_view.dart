@@ -19,9 +19,14 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
 
   // New Sale Form Controllers
   final TextEditingController _clientNameController = TextEditingController();
-  final TextEditingController _clientContactController = TextEditingController();
-  final TextEditingController _clientAddressController = TextEditingController();
+  final TextEditingController _clientContactController =
+      TextEditingController();
+  final TextEditingController _clientAddressController =
+      TextEditingController();
+  final TextEditingController _totalSaleAmountController =
+      TextEditingController();
   final TextEditingController _paidAmountController = TextEditingController();
+  final Map<String, TextEditingController> _quantityControllers = {};
 
   // Egg formats quantities for sale
   int _qtyPetit = 0;
@@ -30,12 +35,6 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
   int _qtyPlusGros = 0;
 
   DateTime? _dueDate;
-
-  // Prices per unit
-  final int _pricePetit = 1500;
-  final int _priceMoyen = 1800;
-  final int _priceGros = 2200;
-  final int _pricePlusGros = 2500;
 
   // Mock Sales History
   final List<Map<String, dynamic>> _salesHistory = [
@@ -96,12 +95,8 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     },
   ];
 
-  int get _totalSaleAmount {
-    return (_qtyPetit * _pricePetit) +
-        (_qtyMoyen * _priceMoyen) +
-        (_qtyGros * _priceGros) +
-        (_qtyPlusGros * _pricePlusGros);
-  }
+  int get _totalSaleAmount =>
+      int.tryParse(_totalSaleAmountController.text) ?? 0;
 
   int get _remainingToPay {
     final paid = int.tryParse(_paidAmountController.text) ?? 0;
@@ -113,7 +108,11 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     _clientNameController.dispose();
     _clientContactController.dispose();
     _clientAddressController.dispose();
+    _totalSaleAmountController.dispose();
     _paidAmountController.dispose();
+    for (final controller in _quantityControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -167,7 +166,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
   // --- TAB 1: SALES HISTORY ---
   Widget _buildHistoryTab() {
     final filteredSales = _salesHistory.where((sale) {
-      final nameMatches = sale['client'].toString().toLowerCase().contains(_clientSearchQuery.toLowerCase());
+      final nameMatches = sale['client'].toString().toLowerCase().contains(
+        _clientSearchQuery.toLowerCase(),
+      );
       if (_selectedFilterDate == null) return nameMatches;
       final saleDate = sale['date'] as DateTime;
       return nameMatches &&
@@ -185,7 +186,11 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             children: [
               AppInputBox(
                 placeholder: 'Filtrer par nom de client…',
-                suffix: const Icon(Icons.search, size: 18, color: AppColors.inkSoft),
+                suffix: const Icon(
+                  Icons.search,
+                  size: 18,
+                  color: AppColors.inkSoft,
+                ),
                 onChanged: (val) => setState(() => _clientSearchQuery = val),
               ),
               const SizedBox(height: 8),
@@ -203,7 +208,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.paper,
                     border: Border.all(color: AppColors.line),
@@ -211,7 +219,11 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 16, color: AppColors.inkSoft),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: AppColors.inkSoft,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -220,15 +232,24 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                               : 'Date : ${_formatDate(_selectedFilterDate!)}',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: _selectedFilterDate == null ? AppColors.inkSoft : AppColors.primaryDark,
-                            fontWeight: _selectedFilterDate == null ? FontWeight.normal : FontWeight.bold,
+                            color: _selectedFilterDate == null
+                                ? AppColors.inkSoft
+                                : AppColors.primaryDark,
+                            fontWeight: _selectedFilterDate == null
+                                ? FontWeight.normal
+                                : FontWeight.bold,
                           ),
                         ),
                       ),
                       if (_selectedFilterDate != null)
                         GestureDetector(
-                          onTap: () => setState(() => _selectedFilterDate = null),
-                          child: const Icon(Icons.clear, size: 16, color: AppColors.inkSoft),
+                          onTap: () =>
+                              setState(() => _selectedFilterDate = null),
+                          child: const Icon(
+                            Icons.clear,
+                            size: 16,
+                            color: AppColors.inkSoft,
+                          ),
                         ),
                     ],
                   ),
@@ -262,11 +283,17 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       children: [
                         Text(
                           sale['client'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                          ),
                         ),
                         Text(
                           '${sale['details']} · ${_formatDate(sale['date'] as DateTime)}',
-                          style: const TextStyle(color: AppColors.inkSoft, fontSize: 11),
+                          style: const TextStyle(
+                            color: AppColors.inkSoft,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -276,11 +303,17 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       children: [
                         Text(
                           '${sale['amount']} FCFA',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(height: 3),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
@@ -320,6 +353,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   _clientContactController.clear();
                   _clientAddressController.clear();
                   _paidAmountController.clear();
+                  _totalSaleAmountController.clear();
                   _qtyPetit = 0;
                   _qtyMoyen = 0;
                   _qtyGros = 0;
@@ -356,7 +390,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: debtor['isOverdue'] ? AppColors.errorLight : AppColors.warningLight,
+                  color: debtor['isOverdue']
+                      ? AppColors.errorLight
+                      : AppColors.warningLight,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -364,7 +400,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   debtor['name'].toString().substring(0, 2).toUpperCase(),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: debtor['isOverdue'] ? AppColors.danger : AppColors.warning,
+                    color: debtor['isOverdue']
+                        ? AppColors.danger
+                        : AppColors.warning,
                   ),
                 ),
               ),
@@ -375,14 +413,21 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   children: [
                     Text(
                       debtor['name'] as String,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
                     ),
                     Text(
                       debtor['status'] as String,
                       style: TextStyle(
-                        color: debtor['isOverdue'] ? AppColors.danger : AppColors.inkSoft,
+                        color: debtor['isOverdue']
+                            ? AppColors.danger
+                            : AppColors.inkSoft,
                         fontSize: 11,
-                        fontWeight: debtor['isOverdue'] ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: debtor['isOverdue']
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -392,10 +437,16 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
               ElevatedButton(
                 onPressed: () => _showRepaymentDialog(debtor),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   minimumSize: Size.zero,
                 ),
-                child: const Text('Rembourser', style: TextStyle(fontSize: 11.5)),
+                child: const Text(
+                  'Rembourser',
+                  style: TextStyle(fontSize: 11.5),
+                ),
               ),
             ],
           ),
@@ -421,7 +472,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 children: [
                   Text('Créance restante due : ${debtor['due']} FCFA'),
                   const SizedBox(height: 12),
-                  const Text('Montant remboursé (FCFA) :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  const Text(
+                    'Montant remboursé (FCFA) :',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: refundController,
@@ -432,7 +486,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Mode de paiement :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  const Text(
+                    'Mode de paiement :',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -465,7 +522,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                     final int amt = int.tryParse(refundController.text) ?? 0;
                     if (amt <= 0 || amt > debtor['due']) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Veuillez entrer un montant valide')),
+                        const SnackBar(
+                          content: Text('Veuillez entrer un montant valide'),
+                        ),
                       );
                       return;
                     }
@@ -474,12 +533,17 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       if (debtor['due'] == 0) {
                         debtor['status'] = 'Réglé';
                       } else {
-                        debtor['status'] = 'Créance mise à jour (${debtor['due']} FCFA restant)';
+                        debtor['status'] =
+                            'Créance mise à jour (${debtor['due']} FCFA restant)';
                       }
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Remboursement de $amt FCFA enregistré avec succès !')),
+                      SnackBar(
+                        content: Text(
+                          'Remboursement de $amt FCFA enregistré avec succès !',
+                        ),
+                      ),
                     );
                   },
                   child: const Text('Enregistrer'),
@@ -503,7 +567,14 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
           icon: const Icon(Icons.arrow_back, color: AppColors.primaryDark),
           onPressed: () => setState(() => _isAddingVente = false),
         ),
-        title: const Text('Effectuer une vente', style: TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text(
+          'Effectuer une vente',
+          style: TextStyle(
+            color: AppColors.primaryDark,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(14),
@@ -533,12 +604,31 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             const SizedBox(height: 16),
 
             // Formats counts
-            const Text('SÉLECTIONNER LES FORMATS & QUANTITÉS (ALVÉOLES)', style: AppTypography.label),
+            const Text(
+              'SÉLECTIONNER LES FORMATS & QUANTITÉS (ALVÉOLES)',
+              style: AppTypography.label,
+            ),
             const SizedBox(height: 8),
-            _buildFormatInputRow('Petit format (1500 FCFA)', _qtyPetit, (val) => setState(() => _qtyPetit = val)),
-            _buildFormatInputRow('Moyen format (1800 FCFA)', _qtyMoyen, (val) => setState(() => _qtyMoyen = val)),
-            _buildFormatInputRow('Gros format (2200 FCFA)', _qtyGros, (val) => setState(() => _qtyGros = val)),
-            _buildFormatInputRow('Plus gros format (2500 FCFA)', _qtyPlusGros, (val) => setState(() => _qtyPlusGros = val)),
+            _buildFormatInputRow(
+              'Petit format',
+              _qtyPetit,
+              (val) => setState(() => _qtyPetit = val),
+            ),
+            _buildFormatInputRow(
+              'Moyen format',
+              _qtyMoyen,
+              (val) => setState(() => _qtyMoyen = val),
+            ),
+            _buildFormatInputRow(
+              'Gros format',
+              _qtyGros,
+              (val) => setState(() => _qtyGros = val),
+            ),
+            _buildFormatInputRow(
+              'Plus gros format',
+              _qtyPlusGros,
+              (val) => setState(() => _qtyPlusGros = val),
+            ),
             const SizedBox(height: 16),
 
             // Payment tracking
@@ -553,7 +643,13 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
               ),
               child: Column(
                 children: [
-                  _buildCalculationRow('Montant total', '$_totalSaleAmount FCFA', isBold: true),
+                  AppInputBox(
+                    label: 'Montant total (FCFA)',
+                    placeholder: 'Saisissez le montant total',
+                    controller: _totalSaleAmountController,
+                    inputType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
                   const Divider(height: 16, color: AppColors.line),
                   AppInputBox(
                     label: 'Montant payé (FCFA)',
@@ -565,7 +661,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   _buildCalculationRow(
                     'Reste à payer',
                     '$_remainingToPay FCFA',
-                    valueColor: _remainingToPay > 0 ? AppColors.danger : AppColors.primaryDark,
+                    valueColor: _remainingToPay > 0
+                        ? AppColors.danger
+                        : AppColors.primaryDark,
                     isBold: true,
                   ),
                 ],
@@ -575,7 +673,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
 
             // Due date if credit
             if (_remainingToPay > 0) ...[
-              const Text('ÉCHÉANCE DU CRÉDIT (REQUIS)', style: AppTypography.label),
+              const Text(
+                'ÉCHÉANCE DU CRÉDIT (REQUIS)',
+                style: AppTypography.label,
+              ),
               const SizedBox(height: 6),
               GestureDetector(
                 onTap: () async {
@@ -591,7 +692,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.paper,
                     border: Border.all(color: AppColors.line, width: 1.6),
@@ -599,13 +703,23 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 16, color: AppColors.inkSoft),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: AppColors.inkSoft,
+                      ),
                       const SizedBox(width: 8),
                       Text(
-                        _dueDate == null ? 'Choisir la date d\'échéance' : _formatDate(_dueDate!),
+                        _dueDate == null
+                            ? 'Choisir la date d\'échéance'
+                            : _formatDate(_dueDate!),
                         style: TextStyle(
-                          color: _dueDate == null ? AppColors.inkSoft : AppColors.primaryDark,
-                          fontWeight: _dueDate == null ? FontWeight.normal : FontWeight.bold,
+                          color: _dueDate == null
+                              ? AppColors.inkSoft
+                              : AppColors.primaryDark,
+                          fontWeight: _dueDate == null
+                              ? FontWeight.normal
+                              : FontWeight.bold,
                         ),
                       ),
                     ],
@@ -619,7 +733,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_totalSaleAmount == 0 || (_remainingToPay > 0 && _dueDate == null) || _clientNameController.text.isEmpty)
+                onPressed:
+                    (_totalSaleAmount == 0 ||
+                        (_remainingToPay > 0 && _dueDate == null) ||
+                        _clientNameController.text.isEmpty)
                     ? null
                     : () {
                         setState(() {
@@ -630,11 +747,14 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                             'address': _clientAddressController.text,
                             'details': 'Achat formats variés',
                             'amount': _totalSaleAmount,
-                            'paid': int.tryParse(_paidAmountController.text) ?? 0,
+                            'paid':
+                                int.tryParse(_paidAmountController.text) ?? 0,
                             'due': _remainingToPay,
                             'status': _remainingToPay == 0
                                 ? 'Payé'
-                                : (_remainingToPay == _totalSaleAmount ? 'Crédit' : 'Partiel'),
+                                : (_remainingToPay == _totalSaleAmount
+                                      ? 'Crédit'
+                                      : 'Partiel'),
                           });
 
                           if (_remainingToPay > 0) {
@@ -648,7 +768,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                           _isAddingVente = false;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Vente enregistrée avec succès !')),
+                          const SnackBar(
+                            content: Text('Vente enregistrée avec succès !'),
+                          ),
                         );
                       },
                 child: const Text('Valider la vente'),
@@ -660,7 +782,15 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     );
   }
 
-  Widget _buildFormatInputRow(String label, int value, Function(int) onChanged) {
+  Widget _buildFormatInputRow(
+    String label,
+    int value,
+    Function(int) onChanged,
+  ) {
+    final controller = _quantityControllers.putIfAbsent(
+      label,
+      () => TextEditingController(text: value.toString()),
+    );
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       margin: const EdgeInsets.only(bottom: 8),
@@ -672,11 +802,21 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+          ),
           Row(
             children: [
               GestureDetector(
-                onTap: () => onChanged((value - 1).clamp(0, 1000)),
+                onTap: () {
+                  final next = (value - 1).clamp(0, 10000);
+                  controller.text = next.toString();
+                  controller.selection = TextSelection.collapsed(
+                    offset: controller.text.length,
+                  );
+                  onChanged(next);
+                },
                 child: Container(
                   width: 24,
                   height: 24,
@@ -685,17 +825,42 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('–', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                  child: const Text(
+                    '–',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                '$value',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              SizedBox(
+                width: 80,
+                child: TextField(
+                  controller: controller,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onChanged: (input) {
+                    final parsed = int.tryParse(input);
+                    if (parsed != null && parsed >= 0) onChanged(parsed);
+                  },
+                ),
               ),
               const SizedBox(width: 12),
               GestureDetector(
-                onTap: () => onChanged((value + 1).clamp(0, 1000)),
+                onTap: () {
+                  final next = (value + 1).clamp(0, 10000);
+                  controller.text = next.toString();
+                  controller.selection = TextSelection.collapsed(
+                    offset: controller.text.length,
+                  );
+                  onChanged(next);
+                },
                 child: Container(
                   width: 24,
                   height: 24,
@@ -704,7 +869,13 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('+', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                  child: const Text(
+                    '+',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -714,11 +885,19 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     );
   }
 
-  Widget _buildCalculationRow(String label, String val, {bool isBold = false, Color? valueColor}) {
+  Widget _buildCalculationRow(
+    String label,
+    String val, {
+    bool isBold = false,
+    Color? valueColor,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
+        ),
         Text(
           val,
           style: TextStyle(

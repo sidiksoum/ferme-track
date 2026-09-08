@@ -7,6 +7,8 @@ import '../../../data/datasources/local/local_storage.dart';
 import '../../../data/datasources/remote/api_client.dart';
 import '../../../data/repositories/authentication_repository_impl.dart';
 import '../../../domain/repositories/authentication_repository.dart';
+import '../../../domain/repositories/user_repository.dart';
+import '../../../data/repositories/user_repository_impl.dart';
 
 final getIt = GetIt.instance;
 
@@ -84,6 +86,14 @@ class ServiceLocator {
         networkChecker: getIt.get<NetworkChecker>(),
       ),
     );
+
+    // User repository
+    getIt.registerSingleton<UserRepository>(
+      UserRepositoryImpl(
+        apiClient: getIt.get<ApiClient>(),
+        networkChecker: getIt.get<NetworkChecker>(),
+      ),
+    );
   }
 
   /// Setup use cases
@@ -102,12 +112,18 @@ class LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     print('REQUEST[${options.method}] => PATH: ${options.path}');
+    if (options.data != null) {
+      print('REQUEST DATA: ${options.data}');
+    }
     super.onRequest(options, handler);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     print('RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}');
+    if (response.data != null) {
+      print('RESPONSE DATA: ${response.data}');
+    }
     super.onResponse(response, handler);
   }
 

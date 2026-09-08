@@ -53,8 +53,19 @@ class _SalesScreenState extends State<SalesScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Se déconnecter',
-            onPressed: () async {
-              await authNotifier.logout();
+            onPressed: () {
+              showLogoutConfirmationDialog(context, () async {
+                if (!mounted) return;
+                showActionLoadingDialog(context, message: 'Déconnexion en cours...');
+                final success = await authNotifier.logout();
+                if (!mounted) return;
+                Navigator.of(context, rootNavigator: true).pop();
+                if (!success && authNotifier.error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(authNotifier.error ?? 'Déconnexion impossible.')),
+                  );
+                }
+              });
             },
           ),
         ],

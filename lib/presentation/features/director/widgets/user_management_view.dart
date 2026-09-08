@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../domain/entities/authentication.dart';
+import '../../../../domain/repositories/user_repository.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class UserManagementView extends StatefulWidget {
@@ -12,39 +15,22 @@ class UserManagementView extends StatefulWidget {
 class _UserManagementViewState extends State<UserManagementView> {
   bool _isAddingUser = false;
   bool _isEditingUser = false;
-  int? _editingUserIndex;
+  User? _editingUser;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   final TextEditingController _userNameController = TextEditingController();
   final TextEditingController _userUsernameController = TextEditingController();
   final TextEditingController _userPasswordController = TextEditingController();
   String _userRoleSelection = 'volailler';
 
-  final List<Map<String, String>> _usersList = [
-    {
-      'name': 'Directeur Général',
-      'username': 'directeur',
-      'role': 'directeur',
-      'password': 'password123',
-    },
-    {
-      'name': 'Dr. Koffi (Technicien)',
-      'username': 'technicien',
-      'role': 'technicien',
-      'password': 'techpassword',
-    },
-    {
-      'name': 'Ama Koffi (Volailler)',
-      'username': 'volailler',
-      'role': 'volailler',
-      'password': 'volaillerpass',
-    },
-    {
-      'name': 'Yao (Magasinier)',
-      'username': 'magasinier',
-      'role': 'magasinier',
-      'password': 'magasinierpass',
-    },
-  ];
+  List<User> _usersList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
 
   @override
   void dispose() {
@@ -52,6 +38,165 @@ class _UserManagementViewState extends State<UserManagementView> {
     _userUsernameController.dispose();
     _userPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final result = await getIt<UserRepository>().getUsers();
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        result.fold(
+          (failure) => _errorMessage = failure.message,
+          (users) => _usersList = users,
+        );
+      });
+    }
+  }
+
+  Future<void> _createUser() async {
+    final name = _userNameController.text.trim();
+    final username = _userUsernameController.text.trim();
+    final password = _userPasswordController.text;
+    final role = _userRoleSelection;
+
+    if (!mounted) return;
+    showActionLoadingDialog(context, message: 'Création du collaborateur...');
+
+    try {
+      setState(() => _isLoading = true);
+
+      final result = await getIt<UserRepository>().createUser(
+        email: '${username.toLowerCase()}@fermetrack.com',
+        username: username,
+        fullName: name,
+        phone: '0112233455',
+        role: role,
+        password: password,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => _isLoading = false);
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: ${failure.message}')),
+          );
+        },
+        (newUser) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Collaborateur créé avec succès !')),
+          );
+          setState(() {
+            _isAddingUser = false;
+          });
+          _loadUsers();
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Échec de la création du collaborateur.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateUser() async {
+    if (_editingUser == null) return;
+    final name = _userNameController.text.trim();
+    final username = _userUsernameController.text.trim();
+    final role = _userRoleSelection;
+
+    if (!mounted) return;
+    showActionLoadingDialog(context, message: 'Mise à jour du collaborateur...');
+
+    try {
+      setState(() => _isLoading = true);
+
+      final result = await getIt<UserRepository>().updateUser(
+        userId: _editingUser!.id,
+        email: _editingUser!.email.isEmpty ? '${username.toLowerCase()}@fermetrack.com' : _editingUser!.email,
+        fullName: name,
+        phone: '0112233455',
+        role: role,
+        status: 'active',
+        farmId: _editingUser!.farmId ?? '2ef87261-ee96-4c67-8e4f-fc63825230cb',
+      );
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => _isLoading = false);
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur de mise à jour: ${failure.message}')),
+          );
+        },
+        (updatedUser) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Collaborateur mis à jour avec succès !')),
+          );
+          setState(() {
+            _isEditingUser = false;
+            _editingUser = null;
+          });
+          _loadUsers();
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Échec de la mise à jour du collaborateur.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteUser(User user) async {
+    if (!mounted) return;
+    showActionLoadingDialog(context, message: 'Suppression du collaborateur...');
+
+    try {
+      setState(() => _isLoading = true);
+
+      final result = await getIt<UserRepository>().deleteUser(user.id);
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => _isLoading = false);
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur de suppression: ${failure.message}')),
+          );
+        },
+        (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Utilisateur ${user.fullName} supprimé')),
+          );
+          _loadUsers();
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Échec de la suppression du collaborateur.')),
+        );
+      }
+    }
   }
 
   @override
@@ -87,84 +232,131 @@ class _UserManagementViewState extends State<UserManagementView> {
           const SizedBox(height: 16),
           const Text('UTILISATEURS ENREGISTRÉS', style: AppTypography.labelSmall),
           const SizedBox(height: 9),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _usersList.length,
-              itemBuilder: (context, index) {
-                final user = _usersList[index];
-                IconData roleIcon = Icons.person;
-                if (user['role'] == 'directeur') roleIcon = Icons.admin_panel_settings;
-                if (user['role'] == 'technicien') roleIcon = Icons.engineering;
-                if (user['role'] == 'volailler') roleIcon = Icons.agriculture;
-                if (user['role'] == 'magasinier') roleIcon = Icons.store;
+          if (_isLoading && _usersList.isEmpty)
+            const Expanded(
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_errorMessage != null && _usersList.isEmpty)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: AppColors.danger),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _loadUsers,
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _loadUsers,
+                child: ListView.builder(
+                  itemCount: _usersList.length,
+                  itemBuilder: (context, index) {
+                    final user = _usersList[index];
+                    IconData roleIcon = Icons.person;
+                    if (user.role == 'directeur') roleIcon = Icons.admin_panel_settings;
+                    if (user.role == 'technicien') roleIcon = Icons.engineering;
+                    if (user.role == 'volailler') roleIcon = Icons.agriculture;
+                    if (user.role == 'magasinier') roleIcon = Icons.store;
 
-                return Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.line)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(roleIcon, color: AppColors.primaryDark, size: 22),
+                    return Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: AppColors.line)),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user['name']!,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryLight,
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Identifiant: ${user['username']}  ·  Rôle: ${user['role']}',
-                              style: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
+                            child: Icon(roleIcon, color: AppColors.primaryDark, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user.fullName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Identifiant: ${user.username}  ·  Rôle: ${user.role}',
+                                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
+                                ),
+                                Text(
+                                  'Email: ${user.email}',
+                                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 12, fontStyle: FontStyle.italic),
+                                ),
+                              ],
                             ),
-                            Text(
-                              'Mot de passe: ${user['password']}',
-                              style: const TextStyle(color: AppColors.inkSoft, fontSize: 12, fontStyle: FontStyle.italic),
-                            ),
-                          ],
-                        ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: AppColors.primaryDark),
+                            onPressed: () {
+                              setState(() {
+                                _isEditingUser = true;
+                                _editingUser = user;
+                                _userNameController.text = user.fullName;
+                                _userUsernameController.text = user.username;
+                                _userPasswordController.clear();
+                                _userRoleSelection = user.role;
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: AppColors.danger),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Supprimer un utilisateur'),
+                                  content: Text('Voulez-vous vraiment supprimer ${user.fullName} ?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Annuler'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _deleteUser(user);
+                                      },
+                                      child: const Text(
+                                        'Supprimer',
+                                        style: TextStyle(color: AppColors.danger),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: AppColors.primaryDark),
-                        onPressed: () {
-                          setState(() {
-                            _isEditingUser = true;
-                            _editingUserIndex = index;
-                            _userNameController.text = user['name']!;
-                            _userUsernameController.text = user['username']!;
-                            _userPasswordController.text = user['password']!;
-                            _userRoleSelection = user['role']!;
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: AppColors.danger),
-                        onPressed: () {
-                          setState(() {
-                            final deleted = _usersList.removeAt(index);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Utilisateur ${deleted['name']} supprimé')),
-                            );
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -191,6 +383,7 @@ class _UserManagementViewState extends State<UserManagementView> {
             label: 'Identifiant (Login)',
             placeholder: 'Ex: yaokoffi',
             controller: _userUsernameController,
+            readOnly: _isEditingUser, // Login cannot be updated
           ),
           const SizedBox(height: 14),
           const Text('Rôle de l\'utilisateur', style: AppTypography.label),
@@ -221,71 +414,56 @@ class _UserManagementViewState extends State<UserManagementView> {
             ),
           ),
           const SizedBox(height: 14),
-          AppInputBox(
-            label: 'Mot de passe',
-            placeholder: 'Ex: yaopassword',
-            controller: _userPasswordController,
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _isAddingUser = false;
-                      _isEditingUser = false;
-                      _editingUserIndex = null;
-                    });
-                  },
-                  child: const Text('Annuler'),
+          if (!_isEditingUser) ...[
+            AppInputBox(
+              label: 'Mot de passe',
+              placeholder: 'Ex: yaopassword',
+              controller: _userPasswordController,
+            ),
+            const SizedBox(height: 24),
+          ] else
+            const SizedBox(height: 14),
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator())
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _isAddingUser = false;
+                        _isEditingUser = false;
+                        _editingUser = null;
+                      });
+                    },
+                    child: const Text('Annuler'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_userNameController.text.isEmpty ||
-                        _userUsernameController.text.isEmpty ||
-                        _userPasswordController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Veuillez remplir tous les champs')),
-                      );
-                      return;
-                    }
-
-                    setState(() {
-                      if (_isEditingUser && _editingUserIndex != null) {
-                        _usersList[_editingUserIndex!] = {
-                          'name': _userNameController.text,
-                          'username': _userUsernameController.text,
-                          'role': _userRoleSelection,
-                          'password': _userPasswordController.text,
-                        };
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_userNameController.text.isEmpty ||
+                          _userUsernameController.text.isEmpty ||
+                          (!_isEditingUser && _userPasswordController.text.isEmpty)) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Utilisateur mis à jour')),
+                          const SnackBar(content: Text('Veuillez remplir tous les champs')),
                         );
-                      } else {
-                        _usersList.add({
-                          'name': _userNameController.text,
-                          'username': _userUsernameController.text,
-                          'role': _userRoleSelection,
-                          'password': _userPasswordController.text,
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Utilisateur ajouté')),
-                        );
+                        return;
                       }
-                      _isAddingUser = false;
-                      _isEditingUser = false;
-                      _editingUserIndex = null;
-                    });
-                  },
-                  child: const Text('Enregistrer'),
+
+                      if (_isEditingUser) {
+                        _updateUser();
+                      } else {
+                        _createUser();
+                      }
+                    },
+                    child: const Text('Enregistrer'),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

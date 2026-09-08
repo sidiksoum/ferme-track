@@ -131,6 +131,8 @@ class _AppHomeRouter extends StatefulWidget {
 }
 
 class __AppHomeRouterState extends State<_AppHomeRouter> {
+  bool _isInitializing = true;
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +142,11 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
   Future<void> _initializeApp() async {
     final authNotifier = context.read<AuthNotifier>();
     await authNotifier.init();
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+      });
+    }
   }
 
   void _navigateToHome(String? role) {
@@ -170,7 +177,7 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
   Widget build(BuildContext context) {
     return Consumer<AuthNotifier>(
       builder: (context, authNotifier, _) {
-        if (authNotifier.isLoading) {
+        if (_isInitializing) {
           return const SplashScreen();
         }
 

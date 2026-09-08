@@ -17,13 +17,16 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
   int _verifiedCount = 0;
   int _formatPetit = 0;
   int _formatMoyen = 0;
-  int _formatGrand = 0;
+  int _formatGros = 0;
+  int _formatPlusGros = 0;
 
-  final TextEditingController _verifiedCountController = TextEditingController();
+  final TextEditingController _verifiedCountController =
+      TextEditingController();
   final TextEditingController _commentController = TextEditingController();
   final TextEditingController _petitController = TextEditingController();
   final TextEditingController _moyenController = TextEditingController();
-  final TextEditingController _grandController = TextEditingController();
+  final TextEditingController _grosController = TextEditingController();
+  final TextEditingController _plusGrosController = TextEditingController();
 
   // Lists
   final List<Map<String, dynamic>> _pendingReceptions = [
@@ -34,7 +37,11 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
       'announcedCount': 1664,
       'time': '07:05',
       'verifiedCount': 1660,
-    }
+      'plusGros': 30,
+      'gros': 90,
+      'moyen': 460,
+      'petit': 660,
+    },
   ];
 
   final List<Map<String, dynamic>> _validatedReceptions = [
@@ -48,17 +55,19 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
       'comment': '',
       'formatPetit': 200,
       'formatMoyen': 500,
-      'formatGrand': 280,
-    }
+      'formatGros': 280,
+      'formatPlusGros': 0,
+    },
   ];
 
   int get _totalRepartition {
-    return _formatPetit + _formatMoyen + _formatGrand;
+    return _formatPetit + _formatMoyen + _formatGros + _formatPlusGros;
   }
 
   int get _deviation {
     if (_selectedReceptionToValidate == null) return 0;
-    return (_selectedReceptionToValidate!['announcedCount'] as int) - _verifiedCount;
+    return (_selectedReceptionToValidate!['announcedCount'] as int) -
+        _verifiedCount;
   }
 
   @override
@@ -67,7 +76,8 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
     _commentController.dispose();
     _petitController.dispose();
     _moyenController.dispose();
-    _grandController.dispose();
+    _grosController.dispose();
+    _plusGrosController.dispose();
     super.dispose();
   }
 
@@ -75,16 +85,21 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
     setState(() {
       _selectedReceptionToValidate = reception;
       _verifiedCount = reception['verifiedCount'];
-      _formatPetit = 0;
-      _formatMoyen = 0;
-      _formatGrand = 0;
+      _formatPetit =
+          (reception['petit'] ?? reception['formatPetit'] ?? 0) as int;
+      _formatMoyen =
+          (reception['moyen'] ?? reception['formatMoyen'] ?? 0) as int;
+      _formatGros = (reception['gros'] ?? reception['formatGros'] ?? 0) as int;
+      _formatPlusGros =
+          (reception['plusGros'] ?? reception['formatPlusGros'] ?? 0) as int;
       _commentController.clear();
 
       // Initialize text fields
       _verifiedCountController.text = _verifiedCount.toString();
-      _petitController.text = '0';
-      _moyenController.text = '0';
-      _grandController.text = '0';
+      _petitController.text = _formatPetit.toString();
+      _moyenController.text = _formatMoyen.toString();
+      _grosController.text = _formatGros.toString();
+      _plusGrosController.text = _formatPlusGros.toString();
     });
   }
 
@@ -156,7 +171,9 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                       ),
                     ),
                   ),
-                ..._validatedReceptions.map((item) => _buildValidatedCard(item)),
+                ..._validatedReceptions.map(
+                  (item) => _buildValidatedCard(item),
+                ),
               ],
             ],
           ),
@@ -183,12 +200,27 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
               children: [
                 Text(
                   'Réception des œufs — Bâtiment ${item['building']}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${item['volailler']} — Bât. ${item['building']} · annoncé ${item['announcedCount']} œufs',
-                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
+                  style: const TextStyle(
+                    color: AppColors.inkSoft,
+                    fontSize: 11.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Plus gros ${item['plusGros']} · Gros ${item['gros']} · Moyen ${item['moyen']} · Petit ${item['petit']}',
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -225,12 +257,27 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
               children: [
                 Text(
                   'Réception des œufs — Bâtiment ${item['building']}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${item['volailler']} — Bât. ${item['building']} · annoncé ${item['announcedCount']} œufs',
-                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
+                  style: const TextStyle(
+                    color: AppColors.inkSoft,
+                    fontSize: 11.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Plus gros ${item['plusGros'] ?? item['formatPlusGros'] ?? 0} · Gros ${item['gros'] ?? item['formatGros'] ?? 0} · Moyen ${item['moyen'] ?? item['formatMoyen'] ?? 0} · Petit ${item['petit'] ?? item['formatPetit'] ?? 0}',
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -259,7 +306,8 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
   Widget _buildValidationForm() {
     final item = _selectedReceptionToValidate!;
     final bool hasDeviation = _deviation != 0;
-    final bool commentRequired = hasDeviation && _commentController.text.isEmpty;
+    final bool commentRequired =
+        hasDeviation && _commentController.text.isEmpty;
     final bool repartitionMatch = _totalRepartition == _verifiedCount;
     final bool canValidate = !commentRequired && repartitionMatch;
 
@@ -274,7 +322,11 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
         ),
         title: Text(
           'En provenance de Bâtiment ${item['building']}',
-          style: const TextStyle(color: AppColors.primaryDark, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: AppColors.primaryDark,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -294,7 +346,10 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                 children: [
                   const Text(
                     'Quantité annoncée par le volailler',
-                    style: TextStyle(fontSize: 11, color: AppColors.primaryDark),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.primaryDark,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -302,11 +357,19 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                     children: [
                       Text(
                         '${item['volailler']} — ${item['time']}',
-                        style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.inkSoft,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         '${item['announcedCount']} œufs',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryDark,
+                        ),
                       ),
                     ],
                   ),
@@ -316,7 +379,10 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
             const SizedBox(height: 16),
 
             // Verified count - Direct Numeric text input
-            const Text('QUANTITÉ VÉRIFIÉE EN MAGASIN', style: AppTypography.label),
+            const Text(
+              'QUANTITÉ VÉRIFIÉE EN MAGASIN',
+              style: AppTypography.label,
+            ),
             const SizedBox(height: 6),
             AppInputBox(
               placeholder: 'Saisissez la quantité vérifiée…',
@@ -340,17 +406,28 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning, color: AppColors.danger, size: 16),
+                    const Icon(
+                      Icons.warning,
+                      color: AppColors.danger,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Écart de $_deviation œuf(s)  ·  Commentaire requis',
-                      style: const TextStyle(color: AppColors.danger, fontSize: 11.5, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
-              const Text('COMMENTAIRE JUSTIFICATIF', style: AppTypography.label),
+              const Text(
+                'COMMENTAIRE JUSTIFICATIF',
+                style: AppTypography.label,
+              ),
               const SizedBox(height: 6),
               AppInputBox(
                 placeholder: 'Ex : Casse durant le transport…',
@@ -361,11 +438,14 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
             ],
 
             // egg formatting repartition - Direct Numeric text inputs
-            const Text('RÉPARTITION PAR FORMAT (SAISIE DIRECTE)', style: AppTypography.label),
+            const Text(
+              'RÉPARTITION PAR FORMAT (SAISIE DIRECTE)',
+              style: AppTypography.label,
+            ),
             const SizedBox(height: 8),
-            
+
             AppInputBox(
-              label: 'Petit format',
+              label: 'Petit',
               placeholder: 'Ex: 200',
               inputType: TextInputType.number,
               controller: _petitController,
@@ -376,9 +456,9 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
               },
             ),
             const SizedBox(height: 8),
-            
+
             AppInputBox(
-              label: 'Moyen format',
+              label: 'Moyen',
               placeholder: 'Ex: 500',
               inputType: TextInputType.number,
               controller: _moyenController,
@@ -389,16 +469,27 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
               },
             ),
             const SizedBox(height: 8),
-            
+
             AppInputBox(
-              label: 'Grand format',
+              label: 'Gros',
               placeholder: 'Ex: 280',
               inputType: TextInputType.number,
-              controller: _grandController,
+              controller: _grosController,
               onChanged: (val) {
                 setState(() {
-                  _formatGrand = int.tryParse(val) ?? 0;
+                  _formatGros = int.tryParse(val) ?? 0;
                 });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            AppInputBox(
+              label: 'Plus gros',
+              placeholder: 'Ex: 30',
+              inputType: TextInputType.number,
+              controller: _plusGrosController,
+              onChanged: (val) {
+                setState(() => _formatPlusGros = int.tryParse(val) ?? 0);
               },
             ),
             const SizedBox(height: 16),
@@ -407,7 +498,9 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: repartitionMatch ? AppColors.successLight : AppColors.errorLight,
+                color: repartitionMatch
+                    ? AppColors.successLight
+                    : AppColors.errorLight,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -417,14 +510,18 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                     'Total réparti',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: repartitionMatch ? AppColors.primaryDark : AppColors.danger,
+                      color: repartitionMatch
+                          ? AppColors.primaryDark
+                          : AppColors.danger,
                     ),
                   ),
                   Text(
                     '$_totalRepartition / $_verifiedCount œufs',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: repartitionMatch ? AppColors.primaryDark : AppColors.danger,
+                      color: repartitionMatch
+                          ? AppColors.primaryDark
+                          : AppColors.danger,
                     ),
                   ),
                 ],
@@ -451,13 +548,16 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                             'comment': _commentController.text,
                             'formatPetit': _formatPetit,
                             'formatMoyen': _formatMoyen,
-                            'formatGrand': _formatGrand,
+                            'formatGros': _formatGros,
+                            'formatPlusGros': _formatPlusGros,
                           });
                           _selectedReceptionToValidate = null;
                           _activeTab = 'validated';
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Réception validée avec succès !')),
+                          const SnackBar(
+                            content: Text('Réception validée avec succès !'),
+                          ),
                         );
                       },
                 child: const Text('Valider la réception'),
