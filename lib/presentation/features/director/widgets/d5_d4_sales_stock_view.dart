@@ -219,56 +219,156 @@ class _D5D4SalesStockViewState extends State<D5D4SalesStockView> {
 
         const Text('PLUS GROSSES CRÉANCES', style: AppTypography.labelSmall),
         const SizedBox(height: 9),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: AppColors.errorLight,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'SY',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.danger,
-                  ),
-                ),
+        ..._getReceivables().map(_buildReceivableCard),
+      ],
+    );
+  }
+
+  List<Map<String, dynamic>> _getReceivables() {
+    return [
+      {
+        'client': 'Seydou Yao',
+        'contact': '07 47 48 49 50',
+        'address': 'Gare routière',
+        'saleDetails': '40 plateaux Plus Gros format',
+        'total': 100000,
+        'paid': 35000,
+        'due': 65000,
+        'dueDate': '12/08/2026',
+        'status': 'Échéance dépassée',
+      },
+      {
+        'client': 'Adjoua Tanoh',
+        'contact': '07 08 09 10 11',
+        'address': 'Akoupé Marché',
+        'saleDetails': '20 plateaux Gros format',
+        'total': 44000,
+        'paid': 25500,
+        'due': 18500,
+        'dueDate': '28/08/2026',
+        'status': 'Échéance à venir',
+      },
+      {
+        'client': 'Koffi Mensah',
+        'contact': '05 06 07 08 09',
+        'address': 'Marché central',
+        'saleDetails': '12 plateaux Moyen format',
+        'total': 21600,
+        'paid': 9600,
+        'due': 12000,
+        'dueDate': '15/09/2026',
+        'status': 'Échéance à venir',
+      },
+    ];
+  }
+
+  Widget _buildReceivableCard(Map<String, dynamic> receivable) {
+    final isOverdue = receivable['status'] == 'Échéance dépassée';
+    final statusColor = isOverdue ? AppColors.danger : AppColors.accent;
+
+    return GestureDetector(
+      onTap: () => _showReceivableDetails(receivable),
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          border: Border.all(color: AppColors.line),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isOverdue
+                    ? AppColors.errorLight
+                    : AppColors.warningLight,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 10),
-              Column(
+              child: Icon(
+                Icons.account_balance_wallet_outlined,
+                color: statusColor,
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
-                    'Seydou Yao',
-                    style: TextStyle(
+                    receivable['client'],
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 12.5,
+                      fontSize: 13.5,
                     ),
                   ),
+                  const SizedBox(height: 3),
                   Text(
-                    'Échéance dépassée',
-                    style: TextStyle(color: AppColors.danger, fontSize: 9),
+                    receivable['saleDetails'],
+                    style: const TextStyle(
+                      color: AppColors.inkSoft,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Échéance : ${receivable['dueDate']}',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
-              const Spacer(),
-              const Text(
-                '65 000 FCFA',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.danger,
-                  fontSize: 12.5,
-                ),
+            ),
+            Text(
+              '${receivable['due']} FCFA',
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 12.5,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReceivableDetails(Map<String, dynamic> receivable) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(receivable['client']),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Contact : ${receivable['contact']}'),
+              Text('Adresse : ${receivable['address']}'),
+              const SizedBox(height: 10),
+              Text('Vente : ${receivable['saleDetails']}'),
+              Text('Montant total : ${receivable['total']} FCFA'),
+              Text('Montant payé : ${receivable['paid']} FCFA'),
+              Text('Reste à payer : ${receivable['due']} FCFA'),
+              Text('Date d’échéance : ${receivable['dueDate']}'),
+              Text('Statut : ${receivable['status']}'),
             ],
           ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -37,15 +37,14 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
 
   // Multi-selection options for new activity
   final List<String> _allActivityOptions = [
-    'vitamine',
-    'deparasitant',
-    'vaccination',
-    'anneau de boison',
-    'injection',
-    'allimentation et abrevage',
-    'netoyage',
-    'pese',
-    'collecte des œufs',
+    'Vitamine',
+    'Deparasitant',
+    'Vaccination',
+    'Injection',
+    'Alimentation et abrevage',
+    'Nettoyage',
+    'Pésée',
+    'Collecte des œufs',
   ];
 
   // Selected values for activity multiselects
@@ -75,6 +74,7 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
     text: 'Zone Industrielle Yopougon',
   );
   final TextEditingController _orderCostController = TextEditingController();
+  final TextEditingController _orderQuantityController = TextEditingController();
   final TextEditingController _eggExitResponsibleController =
       TextEditingController();
   final TextEditingController _eggExitQuantityController =
@@ -365,14 +365,39 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                   () => setState(() => _selectedBuildingFilter = 'A'),
                 ),
                 _buildFilterChip(
+                  'Bât. A1',
+                  _selectedBuildingFilter == 'A1',
+                  () => setState(() => _selectedBuildingFilter = 'A1'),
+                ),
+                _buildFilterChip(
                   'Bât. B',
                   _selectedBuildingFilter == 'B',
                   () => setState(() => _selectedBuildingFilter = 'B'),
                 ),
                 _buildFilterChip(
+                  'Bât. B1',
+                  _selectedBuildingFilter == 'B1',
+                  () => setState(() => _selectedBuildingFilter = 'B1'),
+                ),
+                _buildFilterChip(
                   'Bât. C',
                   _selectedBuildingFilter == 'C',
                   () => setState(() => _selectedBuildingFilter = 'C'),
+                ),
+                _buildFilterChip(
+                  'Bât. D',
+                  _selectedBuildingFilter == 'D',
+                  () => setState(() => _selectedBuildingFilter = 'D'),
+                ),
+                _buildFilterChip(
+                  'Bât. E',
+                  _selectedBuildingFilter == 'E',
+                  () => setState(() => _selectedBuildingFilter = 'E'),
+                ),
+                _buildFilterChip(
+                  'Bât. F',
+                  _selectedBuildingFilter == 'F',
+                  () => setState(() => _selectedBuildingFilter = 'F'),
                 ),
               ],
             ),
@@ -618,8 +643,21 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                       border: OutlineInputBorder(),
                     ),
                   ),
-                ],
-                const SizedBox(height: 14),
+                  const SizedBox(height: 12),
+                const Text(
+                  'Commentaire de réception :',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: commentController,
+                  decoration: const InputDecoration(
+                    hintText: 'Ex : Marchandise conforme reçue en bon état.',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                ]else ...[
+                  const SizedBox(height: 14),
                 const Text(
                   'Quantité reçue :',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
@@ -646,6 +684,7 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                ],
               ],
             ),
             actions: [
@@ -1518,17 +1557,9 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
           const SizedBox(height: 14),
 
           AppInputBox(
-            label: 'Adresse de livraison',
+            label: 'Adresse fournisseur',
             placeholder: 'Ex: Zone 4 Abidjan',
             controller: _orderAddressController,
-          ),
-          const SizedBox(height: 14),
-
-          AppInputBox(
-            label: 'Coût',
-            placeholder: 'Ex: 250 000 FCFA',
-            controller: _orderCostController,
-            inputType: TextInputType.number,
           ),
           const SizedBox(height: 14),
 
@@ -1549,12 +1580,7 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                   if (val != null) {
                     setState(() {
                       _orderType = val;
-                      if (val == 'aliment')
-                        _orderArticle = 'Aliment ponte 20 kg';
-                      if (val == 'sanitaire')
-                        _orderArticle = 'Vaccin Newcastle';
-                      if (val == 'volaille')
-                        _orderArticle = 'Poussins d\'un jour';
+                      _syncOrderArticleForType();
                     });
                   }
                 },
@@ -1565,11 +1591,11 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                   ),
                   DropdownMenuItem(
                     value: 'sanitaire',
-                    child: Text('Sanitaire / Vétérinaire'),
+                    child: Text('Vétérinaire'),
                   ),
                   DropdownMenuItem(
                     value: 'volaille',
-                    child: Text('Volaille / Sujets'),
+                    child: Text('Volaille'),
                   ),
                 ],
               ),
@@ -1588,7 +1614,9 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _orderArticle,
+                value: _getArticlesForType().contains(_orderArticle)
+                    ? _orderArticle
+                    : _getArticlesForType().first,
                 isExpanded: true,
                 onChanged: (val) {
                   if (val != null) {
@@ -1652,6 +1680,22 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
           ),
           const SizedBox(height: 24),
 
+          AppInputBox(
+            label: 'Quantité',
+            placeholder: 'Ex: 20 sacs',
+            controller: _orderQuantityController,
+            inputType: TextInputType.number,
+          ),
+          const SizedBox(height: 14),
+
+          AppInputBox(
+            label: 'Coût',
+            placeholder: 'Ex: 250 000 FCFA',
+            controller: _orderCostController,
+            inputType: TextInputType.number,
+          ),
+          const SizedBox(height: 14),
+
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -1678,6 +1722,9 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                     'cost': _orderCostController.text.trim().isEmpty
                         ? 'Coût non renseigné'
                         : '${_orderCostController.text.trim()} FCFA',
+                    'quantity': _orderQuantityController.text.trim().isEmpty
+                        ? 'Quantité non renseignée'
+                        : '${_orderQuantityController.text.trim()} sacs',
                   });
                   _isAddingOrderForm = false;
                 });
@@ -1701,14 +1748,38 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
     );
   }
 
-  List<String> _getArticlesForType() {
-    if (_orderType == 'aliment') {
-      return ['Aliment ponte 20 kg', 'Aliment démarrage', 'Aliment croissance'];
-    } else if (_orderType == 'sanitaire') {
-      return ['Vaccin Newcastle', 'Vitamines complexes', 'Vermifuge liquide'];
-    } else {
-      return ['Poussins d\'un jour', 'Poulettes démarrées', 'Coquelets vifs'];
+  void _syncOrderArticleForType() {
+    final articles = _getArticlesForType();
+    if (!articles.contains(_orderArticle)) {
+      _orderArticle = articles.first;
     }
+  }
+
+  List<String> _getArticlesForType() {
+    final rawOptions = {
+      'aliment': [
+        'Aliments',
+      ],
+      'sanitaire': [
+        'Produit veto',
+      ],
+      'volaille': [
+        'Volailles',
+      ],
+    };
+
+    final options = <String>[];
+    for (final article in (rawOptions[_orderType] ?? rawOptions['aliment']!)) {
+      if (!options.contains(article)) {
+        options.add(article);
+      }
+    }
+
+    if (!options.contains(_orderArticle)) {
+      _orderArticle = options.first;
+    }
+
+    return options;
   }
 
   Widget _buildSubTabButton(String label, bool isSelected, VoidCallback onTap) {
