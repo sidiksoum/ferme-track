@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -5,12 +6,14 @@ import 'package:dio/dio.dart';
 import '../../../../config/constants/app_constants.dart';
 import '../../../../core/exceptions/app_exceptions.dart';
 import '../../../../core/utils/app_logger.dart';
+import '../local/cache_manager.dart';
 
-/// API Client for remote communication
+/// API Client for remote communication with intelligent local caching and offline fallback
 class ApiClient {
   final Dio _dio;
+  final CacheManager? _cacheManager;
 
-  ApiClient(this._dio) {
+  ApiClient(this._dio, [this._cacheManager]) {
     _dio.options = BaseOptions(
       baseUrl: AppConstants.baseUrl,
       connectTimeout: AppConstants.connectionTimeout,
@@ -29,22 +32,82 @@ class ApiClient {
     _dio.options.headers.remove('Authorization');
   }
 
-  /// GET request
+  /// GET request avec support du cache local (Cache-First avec rafraîchissement ou Network-First)
   Future<dynamic> get(
     String endpoint, {
     Map<String, dynamic>? queryParameters,
     Options? options,
+    bool useCache = true,
+    Duration cacheTtl = const Duration(hours: 12),
+    bool forceRefresh = false,
   }) async {
+    final cacheKey = CacheManager.makeKey(endpoint, queryParameters);
+
+    // 1. Si le cache est demandé et qu'on ne force pas le rafraîchissement, vérifier le cache local
+    if (useCache && !forceRefresh && _cacheManager != null) {
+      final cachedData = _cacheManager.getCachedResponse(cacheKey);
+      if (cachedData != null) {
+        AppLogger.debug('⚡ [CACHE HIT] $cacheKey');
+
+        // Déclencher un rafraîchissement silencieux en arrière-plan (Stale-While-Revalidate)
+        unawaited(_fetchAndCacheInBackground(endpoint, queryParameters, options, cacheKey, cacheTtl));
+
+        return cachedData;
+      }
+    }
+
+    // 2. Appel réseau direct
     try {
-      AppLogger.debug('GET: $endpoint');
+      AppLogger.debug('🌐 [NETWORK GET] $endpoint');
       final response = await _dio.get<dynamic>(
         endpoint,
         queryParameters: queryParameters,
         options: options,
       );
-      return _handleResponse(response);
+      final data = _handleResponse(response);
+
+      // Mettre en cache la nouvelle réponse
+      if (useCache && _cacheManager != null) {
+        await _cacheManager.cacheResponse(cacheKey, data, ttl: cacheTtl);
+      }
+
+      return data;
     } on DioException catch (e) {
+      // 3. En cas d'échec réseau, tenter un fallback sur le cache même expiré (mode dégradé hors-ligne)
+      if (useCache && _cacheManager != null) {
+        final fallbackData = _cacheManager.getCachedResponse(cacheKey, ignoreExpiration: true);
+        if (fallbackData != null) {
+          AppLogger.warning('📴 [OFFLINE FALLBACK CACHE] Réponse servie depuis le cache pour: $cacheKey');
+          return fallbackData;
+        }
+      }
       throw _handleError(e);
+    } catch (e) {
+      if (useCache && _cacheManager != null) {
+        final fallbackData = _cacheManager.getCachedResponse(cacheKey, ignoreExpiration: true);
+        if (fallbackData != null) return fallbackData;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _fetchAndCacheInBackground(
+    String endpoint,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    String cacheKey,
+    Duration cacheTtl,
+  ) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        endpoint,
+        queryParameters: queryParameters,
+        options: options,
+      );
+      final data = _handleResponse(response);
+      await _cacheManager?.cacheResponse(cacheKey, data, ttl: cacheTtl);
+    } catch (_) {
+      // Ignorer silencieusement les erreurs de rafraîchissement d'arrière-plan
     }
   }
 

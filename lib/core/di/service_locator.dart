@@ -1,14 +1,17 @@
-import 'package:get_it/get_it.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:get_it/get_it.dart';
 
-import '../interfaces/network_checker.dart';
+import '../../../data/datasources/local/cache_manager.dart';
 import '../../../data/datasources/local/local_storage.dart';
 import '../../../data/datasources/remote/api_client.dart';
 import '../../../data/repositories/authentication_repository_impl.dart';
+import '../../../data/repositories/user_repository_impl.dart';
 import '../../../domain/repositories/authentication_repository.dart';
 import '../../../domain/repositories/user_repository.dart';
-import '../../../data/repositories/user_repository_impl.dart';
+import '../interfaces/network_checker.dart';
+import '../services/offline_sync_service.dart';
+import '../services/socket_client_service.dart';
 
 final getIt = GetIt.instance;
 
@@ -19,14 +22,14 @@ class ServiceLocator {
     // External packages
     _setupExternalDependencies();
 
-    // Core
-    _setupCoreDependencies();
-
-    // Data sources
-    _setupDataSources();
+    // Data sources & Cache
+    await _setupDataSources();
 
     // Repositories
     _setupRepositories();
+
+    // Core Services (Sync & WebSockets)
+    await _setupCoreServices();
 
     // Use cases
     _setupUseCases();
@@ -37,9 +40,9 @@ class ServiceLocator {
 
   /// Setup external dependencies (plugins)
   static void _setupExternalDependencies() {
-    // Network connectivity checker - use NetworkCheckerStub for now
+    // Real network connectivity checker
     getIt.registerSingleton<NetworkChecker>(
-      NetworkCheckerStub(),
+      NetworkCheckerImpl(),
     );
 
     // Secure storage
@@ -58,21 +61,21 @@ class ServiceLocator {
     );
   }
 
-  /// Setup core dependencies (utilities, helpers)
-  static void _setupCoreDependencies() {
-    // Add your core utilities here
-  }
-
   /// Setup data sources
-  static void _setupDataSources() {
-    // Local storage
+  static Future<void> _setupDataSources() async {
+    // Cache Manager
+    final cacheManager = CacheManager();
+    await cacheManager.init();
+    getIt.registerSingleton<CacheManager>(cacheManager);
+
+    // Local secure storage
     getIt.registerSingleton<LocalStorage>(
       LocalStorageImpl(getIt<FlutterSecureStorage>()),
     );
 
-    // API Client
+    // API Client with Cache integration
     getIt.registerSingleton<ApiClient>(
-      ApiClient(getIt<Dio>()),
+      ApiClient(getIt<Dio>(), getIt<CacheManager>()),
     );
   }
 
@@ -96,15 +99,30 @@ class ServiceLocator {
     );
   }
 
-  /// Setup use cases
-  static void _setupUseCases() {
-    // Add use cases here as needed
+  /// Setup core services (Offline Sync Engine & Real-time Socket.IO)
+  static Future<void> _setupCoreServices() async {
+    // Offline Sync Service
+    final offlineSyncService = OfflineSyncService(
+      apiClient: getIt<ApiClient>(),
+      networkChecker: getIt<NetworkChecker>(),
+      cacheManager: getIt<CacheManager>(),
+    );
+    await offlineSyncService.init();
+    getIt.registerSingleton<OfflineSyncService>(offlineSyncService);
+
+    // Real-time Socket.IO Service
+    final socketClientService = SocketClientService(
+      cacheManager: getIt<CacheManager>(),
+      networkChecker: getIt<NetworkChecker>(),
+    );
+    getIt.registerSingleton<SocketClientService>(socketClientService);
   }
 
+  /// Setup use cases
+  static void _setupUseCases() {}
+
   /// Setup Bloc/Providers
-  static void _setupBlocProviders() {
-    // Add bloc/providers here as needed
-  }
+  static void _setupBlocProviders() {}
 }
 
 /// Logging Interceptor for Dio

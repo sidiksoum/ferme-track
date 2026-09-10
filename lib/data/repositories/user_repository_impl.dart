@@ -29,10 +29,6 @@ class UserRepositoryImpl implements UserRepository {
   @override
   Future<Either<AppException, List<User>>> getUsers({String? role}) async {
     try {
-      if (!await networkChecker.hasConnection) {
-        return Left(NetworkException(message: 'Pas de connexion Internet.'));
-      }
-
       final queryParams = <String, dynamic>{};
       if (role != null) {
         queryParams['role'] = _mapRoleToBackend(role);
@@ -41,12 +37,14 @@ class UserRepositoryImpl implements UserRepository {
       final response = await apiClient.get(
         '/users',
         queryParameters: queryParams,
+        useCache: true,
       );
 
-      // Parse list of users
-      final List<dynamic> usersJson = response as List<dynamic>? ?? [];
-      final List<User> usersList = usersJson.map((json) {
-        final dto = UserRemoteDto.fromMap(json as Map<String, dynamic>);
+      // Parse list of users safely from any Map type
+      final List<dynamic> usersJson = response is List ? response : [];
+      final List<User> usersList = usersJson.whereType<Map>().map((jsonMap) {
+        final map = Map<String, dynamic>.from(jsonMap);
+        final dto = UserRemoteDto.fromMap(map);
         return dto.toEntity();
       }).toList();
 

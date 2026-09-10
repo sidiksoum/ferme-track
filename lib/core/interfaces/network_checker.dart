@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+
 /// Abstract interface for network connectivity checking
 abstract class NetworkChecker {
   /// Check if device has internet connection
   Future<bool> get hasConnection;
-  
-  /// Stream of connectivity status changes
+
+  /// Stream of connectivity status changes (true = online, false = offline)
   Stream<bool> get connectivityStream;
 }
 
@@ -16,17 +19,18 @@ class NetworkCheckerStub implements NetworkChecker {
   Stream<bool> get connectivityStream => Stream.value(true);
 }
 
-/// Implementation using internet_connection_checker_plus
+/// Robust implementation using internet_connection_checker_plus
 class NetworkCheckerImpl implements NetworkChecker {
-  final dynamic _checker; // InternetConnectionCheckerPlus instance
+  final InternetConnection _checker;
 
-  NetworkCheckerImpl(this._checker);
+  NetworkCheckerImpl([InternetConnection? checker])
+      : _checker = checker ?? InternetConnection();
 
   @override
   Future<bool> get hasConnection async {
     try {
-      return await _checker.hasConnection;
-    } catch (e) {
+      return await _checker.hasInternetAccess;
+    } catch (_) {
       return false;
     }
   }
@@ -35,9 +39,9 @@ class NetworkCheckerImpl implements NetworkChecker {
   Stream<bool> get connectivityStream {
     try {
       return _checker.onStatusChange.map((status) {
-        return status == 'connected';
-      });
-    } catch (e) {
+        return status == InternetStatus.connected;
+      }).asBroadcastStream();
+    } catch (_) {
       return Stream.value(false);
     }
   }

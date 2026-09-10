@@ -67,7 +67,7 @@ class AuthNotifier extends ChangeNotifier {
 
     try {
       final result = await _authRepository.login(username, password);
-      return result.fold(
+      final isSuccess = result.fold(
         (exception) {
           if (exception.message.toLowerCase().contains('offline') || 
               exception.message.toLowerCase().contains('timeout') || 
@@ -89,6 +89,7 @@ class AuthNotifier extends ChangeNotifier {
           return true;
         },
       );
+      return isSuccess;
     } catch (e) {
       _error = 'Login failed';
       _isLoading = false;
@@ -105,7 +106,7 @@ class AuthNotifier extends ChangeNotifier {
 
     try {
       final result = await _authRepository.logout();
-      return result.fold(
+      final isSuccess = result.fold(
         (exception) {
           _error = exception.message;
           _isLoading = false;
@@ -122,6 +123,7 @@ class AuthNotifier extends ChangeNotifier {
           return true;
         },
       );
+      return isSuccess;
     } catch (e) {
       _error = 'Logout failed';
       _isLoading = false;
@@ -138,7 +140,7 @@ class AuthNotifier extends ChangeNotifier {
 
     try {
       final result = await _authRepository.authenticateWithBiometric();
-      return result.fold(
+      final isSuccess = result.fold(
         (exception) {
           _error = exception.message;
           _isLoading = false;
@@ -154,6 +156,7 @@ class AuthNotifier extends ChangeNotifier {
           return true;
         },
       );
+      return isSuccess;
     } catch (e) {
       _error = 'Biometric authentication failed';
       _isLoading = false;
@@ -166,7 +169,7 @@ class AuthNotifier extends ChangeNotifier {
   Future<bool> enableBiometric(String password) async {
     try {
       final result = await _authRepository.enableBiometric(password);
-      return result.fold(
+      final isSuccess = result.fold(
         (exception) {
           _error = exception.message;
           notifyListeners();
@@ -179,6 +182,7 @@ class AuthNotifier extends ChangeNotifier {
           return true;
         },
       );
+      return isSuccess;
     } catch (e) {
       _error = 'Failed to enable biometric';
       notifyListeners();
@@ -190,7 +194,7 @@ class AuthNotifier extends ChangeNotifier {
   Future<bool> disableBiometric() async {
     try {
       final result = await _authRepository.disableBiometric();
-      return result.fold(
+      final isSuccess = result.fold(
         (exception) {
           _error = exception.message;
           notifyListeners();
@@ -203,6 +207,7 @@ class AuthNotifier extends ChangeNotifier {
           return true;
         },
       );
+      return isSuccess;
     } catch (e) {
       _error = 'Failed to disable biometric';
       notifyListeners();

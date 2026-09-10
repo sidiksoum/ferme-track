@@ -666,3 +666,88 @@ class _CounterBoxState extends State<CounterBox> {
     );
   }
 }
+
+/// Badge affichant en temps réel l'état de synchronisation hors-ligne
+class SyncStatusBadge extends StatelessWidget {
+  final bool isOnline;
+  final bool isSyncing;
+  final int pendingCount;
+  final VoidCallback? onSyncTap;
+
+  const SyncStatusBadge({
+    super.key,
+    required this.isOnline,
+    required this.isSyncing,
+    required this.pendingCount,
+    this.onSyncTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color dotColor;
+    String label;
+    IconData icon;
+
+    if (isSyncing) {
+      dotColor = Colors.blue;
+      label = 'Synchronisation... ($pendingCount)';
+      icon = Icons.sync;
+    } else if (pendingCount > 0) {
+      if (!isOnline) {
+        dotColor = Colors.orange;
+        label = '$pendingCount en attente (Hors-ligne)';
+        icon = Icons.cloud_off_outlined;
+      } else {
+        dotColor = Colors.amber.shade800;
+        label = '$pendingCount à synchroniser';
+        icon = Icons.sync_problem;
+      }
+    } else if (!isOnline) {
+      dotColor = Colors.orange;
+      label = 'Mode hors-ligne';
+      icon = Icons.cloud_off_outlined;
+    } else {
+      dotColor = AppColors.syncGreen;
+      label = 'Synchronisé';
+      icon = Icons.check_circle_outline;
+    }
+
+    return InkWell(
+      onTap: onSyncTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: dotColor.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: dotColor.withOpacity(0.4), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            isSyncing
+                ? SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(dotColor),
+                    ),
+                  )
+                : Icon(icon, size: 13, color: dotColor),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: dotColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

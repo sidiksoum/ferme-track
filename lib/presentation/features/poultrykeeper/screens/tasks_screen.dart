@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/interfaces/network_checker.dart';
+import '../../../../core/services/offline_sync_service.dart';
 import '../../../../data/datasources/remote/api_client.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../../../providers/auth_provider.dart';
@@ -427,23 +429,73 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
       message: 'Enregistrement de la clôture...',
     );
     try {
+      final networkChecker = getIt<NetworkChecker>();
+      final isOnline = await networkChecker.hasConnection;
+
+      if (!isOnline) {
+        // Enregistrer directement dans la file d'attente hors-ligne
+        await getIt<OfflineSyncService>().enqueueOperation(
+          endpoint: '/volailler/tasks/$taskId/close',
+          method: 'PATCH',
+          payload: payload,
+          description: 'Clôture: ${task['title'] ?? 'Tâche'}',
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text(
+                'Tâche enregistrée hors-ligne ! Elle sera synchronisée automatiquement.',
+              ),
+            ),
+          );
+        }
+        return true;
+      }
+
+      // En ligne : appel API direct
       await getIt<ApiClient>().patch(
         '/volailler/tasks/$taskId/close',
         data: payload,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tâche clôturée avec succès !')),
+          const SnackBar(
+            backgroundColor: AppColors.syncGreen,
+            content: Text('Tâche clôturée avec succès !'),
+          ),
         );
       }
       return true;
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Clôture impossible : $error')));
+      // Fallback si la requête échoue en cours de route
+      try {
+        await getIt<OfflineSyncService>().enqueueOperation(
+          endpoint: '/volailler/tasks/$taskId/close',
+          method: 'PATCH',
+          payload: payload,
+          description: 'Clôture: ${task['title'] ?? 'Tâche'}',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text(
+                'Connexion instable : tâche enregistrée localement pour synchronisation.',
+              ),
+            ),
+          );
+        }
+        return true;
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Clôture impossible : $error')));
+        }
+        return false;
       }
-      return false;
     } finally {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }

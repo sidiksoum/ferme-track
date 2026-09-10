@@ -73,11 +73,9 @@ class _T5GestionViewState extends State<T5GestionView> {
       final currentUser = context.read<AuthNotifier>().currentUser;
 
       final farmsResponse = await _apiClient.get('/farms');
-      final allFarms = List<Map<String, dynamic>>.from(
-        (farmsResponse as List<dynamic>).map(
-          (f) => Map<String, dynamic>.from(f as Map<String, dynamic>),
-        ),
-      );
+      final allFarms = (farmsResponse is List ? farmsResponse : []).whereType<Map>().map(
+        (f) => Map<String, dynamic>.from(f),
+      ).toList();
 
       final availableFarms = currentUser?.farmId != null
           ? allFarms.where((farm) => farm['id'] == currentUser!.farmId).toList()
@@ -124,8 +122,8 @@ class _T5GestionViewState extends State<T5GestionView> {
         queryParameters: {'farm_id': farmId},
       );
 
-      final buildingList = (buildingsResponse as List<dynamic>).map((item) {
-        final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
+      final buildingList = (buildingsResponse is List ? buildingsResponse : []).whereType<Map>().map((item) {
+        final map = Map<String, dynamic>.from(item);
         return BuildingLotItem(
           buildingId: map['id'].toString(),
           buildingName: map['name']?.toString() ?? 'Bâtiment',
@@ -135,8 +133,8 @@ class _T5GestionViewState extends State<T5GestionView> {
       }).toList();
 
       final batchesByBuilding = <String, List<BatchLineItem>>{};
-      final batchList = (batchesResponse as List<dynamic>).map((item) {
-        final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
+      final batchList = (batchesResponse is List ? batchesResponse : []).whereType<Map>().map((item) {
+        final map = Map<String, dynamic>.from(item);
         return BatchLineItem(
           id: map['id'].toString(),
           name: map['name']?.toString() ?? 'Lot',
@@ -151,7 +149,7 @@ class _T5GestionViewState extends State<T5GestionView> {
       for (final batch in batchList) {
         final buildingId = _findBuildingIdForBatch(
           batch.id,
-          batchesResponse as List<dynamic>,
+          batchesResponse is List ? batchesResponse as List<dynamic> : const [],
         );
         if (buildingId != null) {
           batchesByBuilding
@@ -191,9 +189,11 @@ class _T5GestionViewState extends State<T5GestionView> {
 
   String? _findBuildingIdForBatch(String batchId, List<dynamic> batches) {
     for (final item in batches) {
-      final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
-      if (map['id']?.toString() == batchId && map['building_id'] != null) {
-        return map['building_id'].toString();
+      if (item is Map) {
+        final map = Map<String, dynamic>.from(item);
+        if (map['id']?.toString() == batchId && map['building_id'] != null) {
+          return map['building_id'].toString();
+        }
       }
     }
     return null;

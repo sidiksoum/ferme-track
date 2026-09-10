@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'config/constants/app_constants.dart';
 import 'config/theme/app_theme.dart';
 import 'core/di/service_locator.dart';
+import 'core/services/offline_sync_service.dart';
+import 'core/services/socket_client_service.dart';
 import 'core/utils/app_logger.dart';
 import 'data/datasources/local/local_storage.dart';
 import 'domain/repositories/authentication_repository.dart';
@@ -53,6 +55,8 @@ class FermeTrackApp extends StatelessWidget {
             getIt<AuthenticationRepository>(),
           ),
         ),
+        ChangeNotifierProvider.value(value: getIt<OfflineSyncService>()),
+        ChangeNotifierProvider.value(value: getIt<SocketClientService>()),
         ChangeNotifierProvider(create: (_) => ActivitiesProvider()),
         ChangeNotifierProvider(create: (_) => BuildingsProvider()),
         ChangeNotifierProvider(create: (_) => StocksProvider()),
@@ -182,8 +186,16 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
         }
 
         if (authNotifier.isLoggedIn && authNotifier.currentUser != null) {
+          if (authNotifier.sessionInfo != null) {
+            getIt<SocketClientService>().connect(
+              token: authNotifier.sessionInfo!.accessToken,
+              farmId: authNotifier.currentUser!.farmId,
+            );
+          }
           // Navigate based on role
           return _buildHomeScreen(authNotifier.currentUser!.role);
+        } else {
+          getIt<SocketClientService>().disconnect();
         }
 
         return const LoginScreen();
