@@ -73,9 +73,10 @@ class _T5GestionViewState extends State<T5GestionView> {
       final currentUser = context.read<AuthNotifier>().currentUser;
 
       final farmsResponse = await _apiClient.get('/farms');
-      final allFarms = (farmsResponse is List ? farmsResponse : []).whereType<Map>().map(
-        (f) => Map<String, dynamic>.from(f),
-      ).toList();
+      final allFarms = (farmsResponse is List ? farmsResponse : [])
+          .whereType<Map>()
+          .map((f) => Map<String, dynamic>.from(f))
+          .toList();
 
       final availableFarms = currentUser?.farmId != null
           ? allFarms.where((farm) => farm['id'] == currentUser!.farmId).toList()
@@ -122,29 +123,35 @@ class _T5GestionViewState extends State<T5GestionView> {
         queryParameters: {'farm_id': farmId},
       );
 
-      final buildingList = (buildingsResponse is List ? buildingsResponse : []).whereType<Map>().map((item) {
-        final map = Map<String, dynamic>.from(item);
-        return BuildingLotItem(
-          buildingId: map['id'].toString(),
-          buildingName: map['name']?.toString() ?? 'Bâtiment',
-          capacity: map['capacity'] is int ? map['capacity'] as int : null,
-          description: map['description']?.toString(),
-        );
-      }).toList();
+      final buildingList = (buildingsResponse is List ? buildingsResponse : [])
+          .whereType<Map>()
+          .map((item) {
+            final map = Map<String, dynamic>.from(item);
+            return BuildingLotItem(
+              buildingId: map['id'].toString(),
+              buildingName: map['name']?.toString() ?? 'Bâtiment',
+              capacity: map['capacity'] is int ? map['capacity'] as int : null,
+              description: map['description']?.toString(),
+            );
+          })
+          .toList();
 
       final batchesByBuilding = <String, List<BatchLineItem>>{};
-      final batchList = (batchesResponse is List ? batchesResponse : []).whereType<Map>().map((item) {
-        final map = Map<String, dynamic>.from(item);
-        return BatchLineItem(
-          id: map['id'].toString(),
-          name: map['name']?.toString() ?? 'Lot',
-          species: map['species']?.toString() ?? 'poussins',
-          currentCount: map['current_count'] is int
-              ? map['current_count'] as int
-              : 0,
-          status: map['status']?.toString() ?? 'ACTIVE',
-        );
-      }).toList();
+      final batchList = (batchesResponse is List ? batchesResponse : [])
+          .whereType<Map>()
+          .map((item) {
+            final map = Map<String, dynamic>.from(item);
+            return BatchLineItem(
+              id: map['id'].toString(),
+              name: map['name']?.toString() ?? 'Lot',
+              species: map['species']?.toString() ?? 'poussins',
+              currentCount: map['current_count'] is int
+                  ? map['current_count'] as int
+                  : 0,
+              status: map['status']?.toString() ?? 'ACTIVE',
+            );
+          })
+          .toList();
 
       for (final batch in batchList) {
         final buildingId = _findBuildingIdForBatch(
@@ -565,14 +572,14 @@ class _T5GestionViewState extends State<T5GestionView> {
                     ),
                     tooltip: 'Modifier',
                   ),
-                  IconButton(
-                    onPressed: () => _deleteBuilding(building),
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: AppColors.danger,
-                    ),
-                    tooltip: 'Supprimer',
-                  ),
+                  //IconButton(
+                  //onPressed: () => _deleteBuilding(building),
+                  //icon: const Icon(
+                  //Icons.delete_outline,
+                  //color: AppColors.danger,
+                  //),
+                  //tooltip: 'Supprimer',
+                  //),
                 ],
               ),
             ],

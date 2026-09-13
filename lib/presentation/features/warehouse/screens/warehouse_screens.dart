@@ -8,7 +8,7 @@ import '../widgets/m1_accueil_sales_view.dart';
 import '../widgets/m2_sale_caisse_view.dart';
 import '../widgets/m3_egg_reception_view.dart';
 import '../widgets/m4_clients_list_view.dart';
-import '../widgets/m5_caisse_view.dart';
+// import '../widgets/m5_caisse_view.dart';
 import '../widgets/m6_notifications_view.dart';
 
 /// Warehouse Manager main screen combining sales, stock, and clients (M1 - M7)
@@ -35,10 +35,7 @@ class _SalesScreenState extends State<SalesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_getAppBarTitle()),
-            Text(
-              _getAppBarSubtitle(),
-              style: AppTypography.appbarSubtitle,
-            ),
+            Text(_getAppBarSubtitle(), style: AppTypography.appbarSubtitle),
           ],
         ),
         actions: [
@@ -96,13 +93,20 @@ class _SalesScreenState extends State<SalesScreen> {
             onPressed: () {
               showLogoutConfirmationDialog(context, () async {
                 if (!mounted) return;
-                showActionLoadingDialog(context, message: 'Déconnexion en cours...');
+                showActionLoadingDialog(
+                  context,
+                  message: 'Déconnexion en cours...',
+                );
                 final success = await authNotifier.logout();
                 if (!mounted) return;
                 Navigator.of(context, rootNavigator: true).pop();
                 if (!success && authNotifier.error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(authNotifier.error ?? 'Déconnexion impossible.')),
+                    SnackBar(
+                      content: Text(
+                        authNotifier.error ?? 'Déconnexion impossible.',
+                      ),
+                    ),
                   );
                 }
               });
@@ -131,10 +135,10 @@ class _SalesScreenState extends State<SalesScreen> {
             icon: Icon(Icons.shopping_cart),
             label: 'Ventes',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet),
-            label: 'Caisse',
-          ),
+          // BottomNavigationBarItem(
+          //   icon: Icon(Icons.account_balance_wallet),
+          //   label: 'Caisse',
+          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.inbox),
             label: 'Réceptions',
@@ -157,11 +161,11 @@ class _SalesScreenState extends State<SalesScreen> {
         return 'Espace Ventes & Stocks';
       case 1:
         return 'Historique & Facturation';
+      // case 2:
+      //   return 'Journal de Caisse';
       case 2:
-        return 'Journal de Caisse';
-      case 3:
         return 'Réception des œufs';
-      case 4:
+      case 3:
         return 'Fiches Clients';
       default:
         return 'Gestion Magasin';
@@ -174,17 +178,17 @@ class _SalesScreenState extends State<SalesScreen> {
     }
     switch (_selectedNavIndex) {
       case 0:
-        return 'Ferme Akoupé · Tableau de bord';
+        return 'Tableau de bord magasin';
       case 1:
         return 'Journal des factures clients';
+      // case 2:
+      //   return 'Encaissements, décaissements & solde';
       case 2:
-        return 'Encaissements, décaissements & solde';
-      case 3:
         return 'Validation des collectes du Volailler';
-      case 4:
+      case 3:
         return 'Créances & informations de contact';
       default:
-        return 'Ferme Akoupé';
+        return 'Gestion Magasin';
     }
   }
 
@@ -197,7 +201,7 @@ class _SalesScreenState extends State<SalesScreen> {
       children: [
         M1AccueilSalesView(userName: userName),
         const M2SaleCaisseView(),
-        const M5CaisseView(),
+        // const M5CaisseView(),
         const M3EggReceptionView(),
         const M4ClientsListView(),
       ],

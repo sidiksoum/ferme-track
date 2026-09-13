@@ -28,12 +28,18 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
   // Search/Filter states
   String _clientSearchQuery = '';
   DateTime? _selectedFilterDate;
+  String _salesPeriodFilter = 'all'; // all, today, 7j, 30j, custom
+  DateTimeRange? _selectedDateRange;
+  bool _showGraphBreakdown = true;
 
   // New Sale Form Controllers
   final TextEditingController _clientNameController = TextEditingController();
-  final TextEditingController _clientContactController = TextEditingController();
-  final TextEditingController _clientAddressController = TextEditingController();
-  final TextEditingController _totalSaleAmountController = TextEditingController();
+  final TextEditingController _clientContactController =
+      TextEditingController();
+  final TextEditingController _clientAddressController =
+      TextEditingController();
+  final TextEditingController _totalSaleAmountController =
+      TextEditingController();
   final TextEditingController _paidAmountController = TextEditingController();
   final Map<String, TextEditingController> _quantityControllers = {};
 
@@ -62,8 +68,8 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       'due': 0,
       'status': 'Payé',
       'items': [
-        {'name': 'Moyen format', 'quantity': 10, 'total': 20000}
-      ]
+        {'name': 'Moyen format', 'quantity': 10, 'total': 20000},
+      ],
     },
     {
       'id': 'V-002',
@@ -77,8 +83,8 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       'due': 18500,
       'status': 'Partiel',
       'items': [
-        {'name': 'Gros format', 'quantity': 20, 'total': 44000}
-      ]
+        {'name': 'Gros format', 'quantity': 20, 'total': 44000},
+      ],
     },
     {
       'id': 'V-003',
@@ -92,8 +98,8 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       'due': 65000,
       'status': 'Crédit',
       'items': [
-        {'name': 'Plus Gros format', 'quantity': 40, 'total': 100000}
-      ]
+        {'name': 'Plus Gros format', 'quantity': 40, 'total': 100000},
+      ],
     },
   ];
 
@@ -147,7 +153,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     // Écoute temps réel Socket.IO pour rafraîchissement instantané
     _socketSubscription = _socketService.allEvents.listen((event) {
       final evt = event['event']?.toString() ?? '';
-      if (evt == 'sale:created' || evt == 'stock:updated' || evt.contains('reception')) {
+      if (evt == 'sale:created' ||
+          evt == 'stock:updated' ||
+          evt.contains('reception')) {
         if (mounted) {
           _loadAllData(forceRefresh: true);
         }
@@ -174,16 +182,56 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             date = DateTime.now();
           }
           return {
-            'id': s['id']?.toString() ?? 'V-${DateTime.now().millisecondsSinceEpoch}',
+            'id':
+                s['id']?.toString() ??
+                'V-${DateTime.now().millisecondsSinceEpoch}',
             'date': date,
-            'client': s['client']?.toString() ?? s['customer_name']?.toString() ?? 'Client',
-            'contact': s['contact']?.toString() ?? s['customer_phone']?.toString() ?? '—',
-            'address': s['address']?.toString() ?? s['customer_address']?.toString() ?? '—',
+            'client':
+                s['client']?.toString() ??
+                s['customer_name']?.toString() ??
+                'Client',
+            'contact':
+                s['contact']?.toString() ??
+                s['customer_phone']?.toString() ??
+                '—',
+            'address':
+                s['address']?.toString() ??
+                s['customer_address']?.toString() ??
+                '—',
             'details': s['details']?.toString() ?? 'Vente d\'œufs',
-            'amount': (s['amount'] as num?)?.toInt() ?? (s['total_amount'] as num?)?.toInt() ?? 0,
-            'paid': (s['paid'] as num?)?.toInt() ?? (s['amount_paid'] as num?)?.toInt() ?? 0,
-            'due': (s['due'] as num?)?.toInt() ?? (s['remaining_balance'] as num?)?.toInt() ?? 0,
+            'amount':
+                (s['amount'] as num?)?.toInt() ??
+                (s['total_amount'] as num?)?.toInt() ??
+                0,
+            'paid':
+                (s['paid'] as num?)?.toInt() ??
+                (s['amount_paid'] as num?)?.toInt() ??
+                0,
+            'due':
+                (s['due'] as num?)?.toInt() ??
+                (s['remaining_balance'] as num?)?.toInt() ??
+                0,
             'status': s['status']?.toString() ?? 'Payé',
+            'format_petit':
+                (s['format_petit'] as num?)?.toInt() ??
+                (s['qtyPetit'] as num?)?.toInt() ??
+                0,
+            'format_moyen':
+                (s['format_moyen'] as num?)?.toInt() ??
+                (s['qtyMoyen'] as num?)?.toInt() ??
+                0,
+            'format_gros':
+                (s['format_gros'] as num?)?.toInt() ??
+                (s['qtyGros'] as num?)?.toInt() ??
+                0,
+            'format_plus_gros':
+                (s['format_plus_gros'] as num?)?.toInt() ??
+                (s['qtyPlusGros'] as num?)?.toInt() ??
+                0,
+            'quantity_plates':
+                (s['quantity_plates'] as num?)?.toInt() ??
+                (s['quantity'] as num?)?.toInt() ??
+                0,
             'items': s['items'] is List ? s['items'] : [],
           };
         }).toList();
@@ -198,9 +246,13 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       if (mounted && debtorsRes is List && debtorsRes.isNotEmpty) {
         _debtors = debtorsRes.map<Map<String, dynamic>>((d) {
           return {
-            'client_id': d['client_id']?.toString() ?? d['id']?.toString() ?? '',
+            'client_id':
+                d['client_id']?.toString() ?? d['id']?.toString() ?? '',
             'name': d['name']?.toString() ?? 'Client',
-            'due': (d['due'] as num?)?.toInt() ?? (d['balance'] as num?)?.toInt() ?? 0,
+            'due':
+                (d['due'] as num?)?.toInt() ??
+                (d['balance'] as num?)?.toInt() ??
+                0,
             'status': d['status']?.toString() ?? 'Échéance en cours',
             'isOverdue': d['isOverdue'] == true,
             'phone': d['phone']?.toString() ?? '—',
@@ -296,204 +348,434 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
 
   // --- TAB 1: SALES HISTORY ---
   Widget _buildHistoryTab() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
     final filteredSales = _salesHistory.where((sale) {
-      final nameMatches = sale['client'].toString().toLowerCase().contains(
-        _clientSearchQuery.toLowerCase(),
-      );
-      if (_selectedFilterDate == null) return nameMatches;
-      final saleDate = sale['date'] as DateTime;
-      return nameMatches &&
-          saleDate.year == _selectedFilterDate!.year &&
-          saleDate.month == _selectedFilterDate!.month &&
-          saleDate.day == _selectedFilterDate!.day;
+      final clientText = (sale['client'] ?? '').toString().toLowerCase();
+      final idText = (sale['id'] ?? '').toString().toLowerCase();
+      final detailsText = (sale['details'] ?? '').toString().toLowerCase();
+      final q = _clientSearchQuery.trim().toLowerCase();
+      final matchesSearch =
+          q.isEmpty ||
+          clientText.contains(q) ||
+          idText.contains(q) ||
+          detailsText.contains(q);
+
+      if (!matchesSearch) return false;
+
+      final saleDate = sale['date'] is DateTime
+          ? (sale['date'] as DateTime)
+          : DateTime.now();
+
+      if (_selectedFilterDate != null) {
+        if (saleDate.year != _selectedFilterDate!.year ||
+            saleDate.month != _selectedFilterDate!.month ||
+            saleDate.day != _selectedFilterDate!.day) {
+          return false;
+        }
+      }
+
+      switch (_salesPeriodFilter) {
+        case 'today':
+          final sDay = DateTime(saleDate.year, saleDate.month, saleDate.day);
+          return sDay.isAtSameMomentAs(today);
+        case '7j':
+          final sevenDaysAgo = today.subtract(const Duration(days: 7));
+          return saleDate.isAfter(sevenDaysAgo) ||
+              saleDate.isAtSameMomentAs(sevenDaysAgo);
+        case '30j':
+          final thirtyDaysAgo = today.subtract(const Duration(days: 30));
+          return saleDate.isAfter(thirtyDaysAgo) ||
+              saleDate.isAtSameMomentAs(thirtyDaysAgo);
+        case 'custom':
+          if (_selectedDateRange != null) {
+            final start = DateTime(
+              _selectedDateRange!.start.year,
+              _selectedDateRange!.start.month,
+              _selectedDateRange!.start.day,
+            );
+            final end = DateTime(
+              _selectedDateRange!.end.year,
+              _selectedDateRange!.end.month,
+              _selectedDateRange!.end.day,
+              23,
+              59,
+              59,
+            );
+            return (saleDate.isAfter(start) ||
+                    saleDate.isAtSameMomentAs(start)) &&
+                (saleDate.isBefore(end) || saleDate.isAtSameMomentAs(end));
+          }
+          return true;
+        case 'all':
+        default:
+          return true;
+      }
     }).toList();
+
+    final int totalPeriodSales = filteredSales.fold<int>(
+      0,
+      (sum, s) => sum + ((s['amount'] as num?)?.toInt() ?? 0),
+    );
+    final int totalPeriodCash = filteredSales.fold<int>(
+      0,
+      (sum, s) => sum + ((s['paid'] as num?)?.toInt() ?? 0),
+    );
+    final int totalPeriodCredit = filteredSales.fold<int>(
+      0,
+      (sum, s) => sum + ((s['due'] as num?)?.toInt() ?? 0),
+    );
+    final int totalReceivables = _debtors.fold<int>(
+      0,
+      (sum, d) => sum + ((d['due'] as num?)?.toInt() ?? 0),
+    );
 
     return Column(
       children: [
-        // Filters Box
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Column(
-            children: [
-              AppInputBox(
-                placeholder: 'Rechercher par client ou facture…',
-                suffix: const Icon(
-                  Icons.search,
-                  size: 18,
-                  color: AppColors.inkSoft,
-                ),
-                onChanged: (val) => setState(() => _clientSearchQuery = val),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2025),
-                    lastDate: DateTime(2027),
-                  );
-                  if (picked != null) {
-                    setState(() => _selectedFilterDate = picked);
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.paper,
-                    border: Border.all(color: AppColors.line),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: AppColors.inkSoft,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _selectedFilterDate == null
-                              ? 'Filtrer par date (Toutes dates)'
-                              : 'Date : ${_formatDate(_selectedFilterDate!)}',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: _selectedFilterDate == null
-                                ? AppColors.inkSoft
-                                : AppColors.primaryDark,
-                            fontWeight: _selectedFilterDate == null
-                                ? FontWeight.normal
-                                : FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (_selectedFilterDate != null)
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _selectedFilterDate = null),
-                          child: const Icon(
-                            Icons.clear,
-                            size: 16,
-                            color: AppColors.inkSoft,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // List of Sales
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadAllData,
-            child: filteredSales.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucune vente enregistrée',
-                      style: TextStyle(color: AppColors.inkSoft),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    itemCount: filteredSales.length,
-                    itemBuilder: (context, index) {
-                      final sale = filteredSales[index];
-                      Color statusColor = AppColors.primaryDark;
-                      if (sale['status'] == 'Crédit') statusColor = AppColors.danger;
-                      if (sale['status'] == 'Partiel') statusColor = AppColors.accent;
-
-                      return GestureDetector(
-                        onTap: () => _showSaleDetails(sale),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: AppColors.line)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  Icons.receipt_long,
-                                  color: statusColor,
-                                  size: 20,
-                                ),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              children: [
+                // Filter by Period Selector
+                const Text(
+                  'FILTRER PAR PÉRIODE',
+                  style: AppTypography.labelSmall,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper,
+                          border: Border.all(color: AppColors.line, width: 1.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _salesPeriodFilter,
+                            isExpanded: true,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.primaryDark,
+                            ),
+                            onChanged: (val) async {
+                              if (val != null) {
+                                setState(() => _salesPeriodFilter = val);
+                                if (val == 'custom') {
+                                  final picked = await showDateRangePicker(
+                                    context: context,
+                                    firstDate: DateTime(2025),
+                                    lastDate: DateTime(2027),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _selectedDateRange = picked);
+                                  }
+                                }
+                              }
+                            },
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Text('Toutes les ventes (Global)'),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      sale['client'] as String,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${sale['details']} · ${_formatDate(sale['date'] as DateTime)}',
-                                      style: const TextStyle(
-                                        color: AppColors.inkSoft,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              DropdownMenuItem(
+                                value: 'today',
+                                child: Text('Aujourd\'hui'),
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${sale['amount']} FCFA',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      sale['status'] as String,
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: statusColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              DropdownMenuItem(
+                                value: '7j',
+                                child: Text('7 derniers jours'),
+                              ),
+                              DropdownMenuItem(
+                                value: '30j',
+                                child: Text('Mois en cours (30 jours)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'custom',
+                                child: Text('Période personnalisée'),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                  ],
+                ),
+                if (_salesPeriodFilter == 'custom' &&
+                    _selectedDateRange != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Période : ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
+                ],
+                const SizedBox(height: 12),
+
+                // Summary KPI Card
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryDark,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getPeriodLabel(),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_formatCurrency(totalPeriodSales)} FCFA',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(height: 1, color: Colors.white24),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSummaryItem(
+                            'Comptant',
+                            '${_formatCurrency(totalPeriodCash)} FCFA',
+                          ),
+                          _buildSummaryItem(
+                            'Crédit',
+                            '${_formatCurrency(totalPeriodCredit)} FCFA',
+                          ),
+                          _buildSummaryItem(
+                            'Créances tot.',
+                            '${_formatCurrency(totalReceivables)} FCFA',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Real Dynamic Graphical Distribution Chart
+                _buildDynamicSalesChart(filteredSales),
+                const SizedBox(height: 14),
+
+                // Search and Specific Date Filter
+                AppInputBox(
+                  placeholder: 'Rechercher par client ou facture…',
+                  suffix: const Icon(
+                    Icons.search,
+                    size: 18,
+                    color: AppColors.inkSoft,
+                  ),
+                  onChanged: (val) => setState(() => _clientSearchQuery = val),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2025),
+                      lastDate: DateTime(2027),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedFilterDate = picked);
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.paper,
+                      border: Border.all(color: AppColors.line),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: AppColors.inkSoft,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _selectedFilterDate == null
+                                ? 'Filtrer par date exacte (Toutes)'
+                                : 'Date : ${_formatDate(_selectedFilterDate!)}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: _selectedFilterDate == null
+                                  ? AppColors.inkSoft
+                                  : AppColors.primaryDark,
+                              fontWeight: _selectedFilterDate == null
+                                  ? FontWeight.normal
+                                  : FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (_selectedFilterDate != null)
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => _selectedFilterDate = null),
+                            child: const Icon(
+                              Icons.clear,
+                              size: 16,
+                              color: AppColors.inkSoft,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Section Title
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'HISTORIQUE DES FACTURES (${filteredSales.length})',
+                      style: AppTypography.labelSmall,
+                    ),
+                    if (filteredSales.isNotEmpty)
+                      Text(
+                        'Total : ${_formatCurrency(totalPeriodSales)} FCFA',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Sales list items
+                if (filteredSales.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 36),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Aucune vente enregistrée pour cette sélection',
+                      style: TextStyle(color: AppColors.inkSoft),
+                    ),
+                  )
+                else
+                  ...filteredSales.map((sale) {
+                    Color statusColor = AppColors.primaryDark;
+                    if (sale['status'] == 'Crédit')
+                      statusColor = AppColors.danger;
+                    if (sale['status'] == 'Partiel')
+                      statusColor = AppColors.accent;
+
+                    return GestureDetector(
+                      onTap: () => _showSaleDetails(sale),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: AppColors.line),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.receipt_long,
+                                color: statusColor,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    sale['client'] as String,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${sale['details']} · ${_formatDate(sale['date'] as DateTime)}',
+                                    style: const TextStyle(
+                                      color: AppColors.inkSoft,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${_formatCurrency((sale['amount'] as num?)?.toInt() ?? 0)} FCFA',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    sale['status'] as String,
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
 
@@ -571,7 +853,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                         alignment: Alignment.center,
                         child: Text(
                           debtor['name'].toString().isNotEmpty
-                              ? debtor['name'].toString().substring(0, 2).toUpperCase()
+                              ? debtor['name']
+                                    .toString()
+                                    .substring(0, 2)
+                                    .toUpperCase()
                               : 'CL',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
@@ -643,15 +928,33 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
 
         final items = (sale['items'] is List) ? (sale['items'] as List) : [];
         final statusText = sale['status']?.toString() ?? 'Payé';
-        final clientName = sale['client']?.toString() ?? sale['customer_name']?.toString() ?? 'Client';
-        final contactStr = sale['contact']?.toString() ?? sale['customer_phone']?.toString() ?? '—';
-        final addressStr = sale['address']?.toString() ?? sale['customer_address']?.toString() ?? '—';
+        final clientName =
+            sale['client']?.toString() ??
+            sale['customer_name']?.toString() ??
+            'Client';
+        final contactStr =
+            sale['contact']?.toString() ??
+            sale['customer_phone']?.toString() ??
+            '—';
+        final addressStr =
+            sale['address']?.toString() ??
+            sale['customer_address']?.toString() ??
+            '—';
         final dateStr = sale['date'] is DateTime
             ? _formatDate(sale['date'] as DateTime)
             : (sale['date']?.toString().split('T')[0] ?? '—');
-        final amountVal = (sale['amount'] as num?)?.toDouble() ?? (sale['total_amount'] as num?)?.toDouble() ?? 0.0;
-        final paidVal = (sale['paid'] as num?)?.toDouble() ?? (sale['amount_paid'] as num?)?.toDouble() ?? 0.0;
-        final dueVal = (sale['due'] as num?)?.toDouble() ?? (sale['remaining_balance'] as num?)?.toDouble() ?? 0.0;
+        final amountVal =
+            (sale['amount'] as num?)?.toDouble() ??
+            (sale['total_amount'] as num?)?.toDouble() ??
+            0.0;
+        final paidVal =
+            (sale['paid'] as num?)?.toDouble() ??
+            (sale['amount_paid'] as num?)?.toDouble() ??
+            0.0;
+        final dueVal =
+            (sale['due'] as num?)?.toDouble() ??
+            (sale['remaining_balance'] as num?)?.toDouble() ??
+            0.0;
 
         return AlertDialog(
           title: Row(
@@ -690,7 +993,11 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 const Divider(height: 20, color: AppColors.line),
                 const Text(
                   'ARTICLES VENDUS',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.inkSoft),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.inkSoft,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 if (items.isEmpty)
@@ -701,12 +1008,15 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 else
                   ...items.map((item) {
                     final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-                    final unitPrice = (item['unit_price'] as num?)?.toDouble() ??
+                    final unitPrice =
+                        (item['unit_price'] as num?)?.toDouble() ??
                         (item['unitPrice'] as num?)?.toDouble() ??
                         0.0;
-                    final total = (item['total'] as num?)?.toDouble() ??
+                    final total =
+                        (item['total'] as num?)?.toDouble() ??
                         (qty * unitPrice);
-                    final name = item['name']?.toString() ??
+                    final name =
+                        item['name']?.toString() ??
                         item['calibre']?.toString() ??
                         'Article';
                     return Padding(
@@ -720,15 +1030,26 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                           ),
                           Text(
                             '${total.toInt()} FCFA',
-                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
                     );
                   }),
                 const Divider(height: 20, color: AppColors.line),
-                _buildModalRow('Montant Total :', '${amountVal.toInt()} FCFA', isBold: true),
-                _buildModalRow('Montant Réglé :', '${paidVal.toInt()} FCFA', color: AppColors.primaryDark),
+                _buildModalRow(
+                  'Montant Total :',
+                  '${amountVal.toInt()} FCFA',
+                  isBold: true,
+                ),
+                _buildModalRow(
+                  'Montant Réglé :',
+                  '${paidVal.toInt()} FCFA',
+                  color: AppColors.primaryDark,
+                ),
                 _buildModalRow(
                   'Solde Restant Dû :',
                   '${dueVal.toInt()} FCFA',
@@ -749,13 +1070,21 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     );
   }
 
-  Widget _buildModalRow(String label, String value, {bool isBold = false, Color? color}) {
+  Widget _buildModalRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? color,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
+          ),
           Text(
             value,
             style: TextStyle(
@@ -786,7 +1115,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 children: [
                   Text(
                     'Créance restante due : ${debtor['due']} FCFA',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.danger),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.danger,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -840,13 +1172,18 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                     if (amt <= 0 || amt > (debtor['due'] as int)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Veuillez entrer un montant valide inférieur ou égal à la dette.'),
+                          content: Text(
+                            'Veuillez entrer un montant valide inférieur ou égal à la dette.',
+                          ),
                         ),
                       );
                       return;
                     }
 
-                    showActionLoadingDialog(context, message: 'Enregistrement du remboursement...');
+                    showActionLoadingDialog(
+                      context,
+                      message: 'Enregistrement du remboursement...',
+                    );
                     bool isOfflineQueued = false;
                     try {
                       final clientId = debtor['client_id'] ?? debtor['id'];
@@ -855,20 +1192,15 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                         await _offlineSyncService.enqueueOperation(
                           endpoint: '/magasinier/clients/$clientId/refund',
                           method: 'POST',
-                          payload: {
-                            'amount': amt,
-                            'payment_method': method,
-                          },
-                          description: 'Remboursement: ${debtor['name']} ($amt FCFA)',
+                          payload: {'amount': amt, 'payment_method': method},
+                          description:
+                              'Remboursement: ${debtor['name']} ($amt FCFA)',
                         );
                         isOfflineQueued = true;
                       } else {
                         await _apiClient.post(
                           '/magasinier/clients/$clientId/refund',
-                          data: {
-                            'amount': amt,
-                            'payment_method': method,
-                          },
+                          data: {'amount': amt, 'payment_method': method},
                         );
                       }
                     } catch (_) {
@@ -876,16 +1208,17 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       await _offlineSyncService.enqueueOperation(
                         endpoint: '/magasinier/clients/$clientId/refund',
                         method: 'POST',
-                        payload: {
-                          'amount': amt,
-                          'payment_method': method,
-                        },
-                        description: 'Remboursement: ${debtor['name']} ($amt FCFA)',
+                        payload: {'amount': amt, 'payment_method': method},
+                        description:
+                            'Remboursement: ${debtor['name']} ($amt FCFA)',
                       );
                       isOfflineQueued = true;
                     } finally {
                       if (mounted) {
-                        Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+                        Navigator.of(
+                          context,
+                          rootNavigator: true,
+                        ).pop(); // dismiss loading dialog
                       }
                     }
 
@@ -893,9 +1226,12 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       debtor['due'] = (debtor['due'] as int) - amt;
                       if ((debtor['due'] as int) <= 0) {
                         debtor['status'] = 'Réglé';
-                        _debtors.removeWhere((d) => d['name'] == debtor['name']);
+                        _debtors.removeWhere(
+                          (d) => d['name'] == debtor['name'],
+                        );
                       } else {
-                        debtor['status'] = 'Créance mise à jour (${debtor['due']} FCFA restant)';
+                        debtor['status'] =
+                            'Créance mise à jour (${debtor['due']} FCFA restant)';
                       }
                     });
 
@@ -903,7 +1239,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       Navigator.of(dialogCtx).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          backgroundColor: isOfflineQueued ? Colors.orange : AppColors.syncGreen,
+                          backgroundColor: isOfflineQueued
+                              ? Colors.orange
+                              : AppColors.syncGreen,
                           content: Text(
                             isOfflineQueued
                                 ? 'Remboursement enregistré hors-ligne (en attente de synchro) !'
@@ -965,16 +1303,28 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   child: DropdownButton<String>(
                     isExpanded: true,
                     value: _selectedClientId,
-                    hint: const Text('Choisir un client enregistré…', style: TextStyle(fontSize: 13)),
+                    hint: const Text(
+                      'Choisir un client enregistré…',
+                      style: TextStyle(fontSize: 13),
+                    ),
                     items: [
                       const DropdownMenuItem<String>(
                         value: null,
-                        child: Text('+ Nouveau client / Passage', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        child: Text(
+                          '+ Nouveau client / Passage',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
                       ),
                       ..._clientsList.map((c) {
                         return DropdownMenuItem<String>(
                           value: c['id']?.toString(),
-                          child: Text('${c['name']} (${c['phone'] ?? c['type']})', style: const TextStyle(fontSize: 13)),
+                          child: Text(
+                            '${c['name']} (${c['phone'] ?? c['type']})',
+                            style: const TextStyle(fontSize: 13),
+                          ),
                         );
                       }),
                     ],
@@ -982,10 +1332,15 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                       setState(() {
                         _selectedClientId = val;
                         if (val != null) {
-                          final selected = _clientsList.firstWhere((c) => c['id'] == val, orElse: () => {});
+                          final selected = _clientsList.firstWhere(
+                            (c) => c['id'] == val,
+                            orElse: () => {},
+                          );
                           _clientNameController.text = selected['name'] ?? '';
-                          _clientContactController.text = selected['phone'] ?? '';
-                          _clientAddressController.text = selected['address'] ?? '';
+                          _clientContactController.text =
+                              selected['phone'] ?? '';
+                          _clientAddressController.text =
+                              selected['address'] ?? '';
                         }
                       });
                     },
@@ -1019,12 +1374,16 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'SÉLECTIONNER LES FORMATS (PLATEAUX)',
+                  'SÉLECTIONNER LES FORMATS',
                   style: AppTypography.label,
                 ),
                 Text(
                   'Total : ${_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros} plq (${(_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros) * 30} œufs)',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryDark,
+                  ),
                 ),
               ],
             ),
@@ -1154,23 +1513,55 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_totalSaleAmount == 0 ||
+                onPressed:
+                    (_totalSaleAmount == 0 ||
                         (_remainingToPay > 0 && _dueDate == null) ||
                         _clientNameController.text.trim().isEmpty)
                     ? null
                     : () async {
-                        final int totalQty = _qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros;
+                        final int totalQty =
+                            _qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros;
                         final itemsList = [
-                          if (_qtyPetit > 0) {'calibre': 'petit', 'name': 'Petit format', 'quantity': _qtyPetit, 'eggs': _qtyPetit * 30},
-                          if (_qtyMoyen > 0) {'calibre': 'moyen', 'name': 'Moyen format', 'quantity': _qtyMoyen, 'eggs': _qtyMoyen * 30},
-                          if (_qtyGros > 0) {'calibre': 'gros', 'name': 'Gros format', 'quantity': _qtyGros, 'eggs': _qtyGros * 30},
-                          if (_qtyPlusGros > 0) {'calibre': 'plusGros', 'name': 'Plus Gros format', 'quantity': _qtyPlusGros, 'eggs': _qtyPlusGros * 30},
+                          if (_qtyPetit > 0)
+                            {
+                              'calibre': 'petit',
+                              'name': 'Petit format',
+                              'quantity': _qtyPetit,
+                              'eggs': _qtyPetit * 30,
+                            },
+                          if (_qtyMoyen > 0)
+                            {
+                              'calibre': 'moyen',
+                              'name': 'Moyen format',
+                              'quantity': _qtyMoyen,
+                              'eggs': _qtyMoyen * 30,
+                            },
+                          if (_qtyGros > 0)
+                            {
+                              'calibre': 'gros',
+                              'name': 'Gros format',
+                              'quantity': _qtyGros,
+                              'eggs': _qtyGros * 30,
+                            },
+                          if (_qtyPlusGros > 0)
+                            {
+                              'calibre': 'plusGros',
+                              'name': 'Plus Gros format',
+                              'quantity': _qtyPlusGros,
+                              'eggs': _qtyPlusGros * 30,
+                            },
                         ];
 
-                        final int paidAmt = int.tryParse(_paidAmountController.text.trim()) ?? 0;
-                        final String clientName = _clientNameController.text.trim();
-                        final String clientPhone = _clientContactController.text.trim();
-                        final String clientAddress = _clientAddressController.text.trim();
+                        final int paidAmt =
+                            int.tryParse(_paidAmountController.text.trim()) ??
+                            0;
+                        final String clientName = _clientNameController.text
+                            .trim();
+                        final String clientPhone = _clientContactController.text
+                            .trim();
+                        final String clientAddress = _clientAddressController
+                            .text
+                            .trim();
 
                         final saleData = {
                           'customer_id': _selectedClientId,
@@ -1200,7 +1591,10 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                           'items': itemsList,
                         };
 
-                        showActionLoadingDialog(context, message: 'Enregistrement de la vente...');
+                        showActionLoadingDialog(
+                          context,
+                          message: 'Enregistrement de la vente...',
+                        );
                         bool isOfflineQueued = false;
                         try {
                           final isOnline = await _networkChecker.hasConnection;
@@ -1209,23 +1603,31 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                               endpoint: '/magasinier/sales',
                               method: 'POST',
                               payload: saleData,
-                              description: 'Vente: $clientName ($totalQty plq. / $_totalSaleAmount FCFA)',
+                              description:
+                                  'Vente: $clientName ($totalQty plq. / $_totalSaleAmount FCFA)',
                             );
                             isOfflineQueued = true;
                           } else {
-                            await _apiClient.post('/magasinier/sales', data: saleData);
+                            await _apiClient.post(
+                              '/magasinier/sales',
+                              data: saleData,
+                            );
                           }
                         } catch (_) {
                           await _offlineSyncService.enqueueOperation(
                             endpoint: '/magasinier/sales',
                             method: 'POST',
                             payload: saleData,
-                            description: 'Vente: $clientName ($totalQty plq. / $_totalSaleAmount FCFA)',
+                            description:
+                                'Vente: $clientName ($totalQty plq. / $_totalSaleAmount FCFA)',
                           );
                           isOfflineQueued = true;
                         } finally {
                           if (mounted) {
-                            Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+                            Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            ).pop(); // dismiss loading dialog
                           }
                         }
 
@@ -1238,15 +1640,16 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                             'client': clientName,
                             'contact': clientPhone,
                             'address': clientAddress,
-                            'details': '$displayQty plateaux d\'œufs (${displayQty * 30} œufs)',
+                            'details':
+                                '$displayQty plateaux d\'œufs (${displayQty * 30} œufs)',
                             'amount': _totalSaleAmount,
                             'paid': paidAmt,
                             'due': _remainingToPay,
                             'status': _remainingToPay == 0
                                 ? 'Payé'
                                 : (_remainingToPay == _totalSaleAmount
-                                    ? 'Crédit'
-                                    : 'Partiel'),
+                                      ? 'Crédit'
+                                      : 'Partiel'),
                             'items': itemsList,
                           });
 
@@ -1255,7 +1658,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                               'client_id': _selectedClientId ?? '',
                               'name': clientName,
                               'due': _remainingToPay,
-                              'status': _dueDate != null ? 'Échéance ${_formatDate(_dueDate!)}' : 'À crédit',
+                              'status': _dueDate != null
+                                  ? 'Échéance ${_formatDate(_dueDate!)}'
+                                  : 'À crédit',
                               'isOverdue': false,
                               'phone': clientPhone,
                               'address': clientAddress,
@@ -1267,7 +1672,9 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              backgroundColor: isOfflineQueued ? Colors.orange : AppColors.syncGreen,
+                              backgroundColor: isOfflineQueued
+                                  ? Colors.orange
+                                  : AppColors.syncGreen,
                               content: Text(
                                 isOfflineQueued
                                     ? 'Vente enregistrée hors-ligne ($displayQty plq. déstockés localement) !'
@@ -1298,12 +1705,12 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
     );
     final int eggCount = value * 30;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.paper,
         border: Border.all(color: AppColors.line),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1314,11 +1721,18 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   '$value plq. = $eggCount œufs',
-                  style: const TextStyle(fontSize: 10.5, color: AppColors.inkSoft),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.inkSoft,
+                  ),
                 ),
               ],
             ),
@@ -1335,32 +1749,49 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   onChanged(next);
                 },
                 child: Container(
-                  width: 24,
-                  height: 24,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
                   child: const Text(
                     '–',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
+                      fontSize: 18,
                       color: AppColors.primaryDark,
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              SizedBox(
-                width: 50,
+              Container(
+                width: 78,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: AppColors.line, width: 1.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
                 child: TextField(
                   controller: controller,
                   textAlign: TextAlign.center,
                   keyboardType: TextInputType.number,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryDark,
+                  ),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 4,
+                    ),
                   ),
                   onChanged: (input) {
                     final parsed = int.tryParse(input);
@@ -1379,17 +1810,18 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   onChanged(next);
                 },
                 child: Container(
-                  width: 24,
-                  height: 24,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
                   child: const Text(
                     '+',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
+                      fontSize: 18,
                       color: AppColors.primaryDark,
                     ),
                   ),
@@ -1400,6 +1832,378 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
         ],
       ),
     );
+  }
+
+  Widget _buildDynamicSalesChart(List<Map<String, dynamic>> sales) {
+    final now = DateTime.now();
+    final List<DateTime> last7Days = List.generate(7, (i) {
+      final d = now.subtract(Duration(days: 6 - i));
+      return DateTime(d.year, d.month, d.day);
+    });
+
+    final List<String> dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    final Map<int, int> dayPlates = {};
+    for (int i = 0; i < 7; i++) {
+      dayPlates[i] = 0;
+    }
+
+    int totalPetit = 0;
+    int totalMoyen = 0;
+    int totalGros = 0;
+    int totalPlusGros = 0;
+
+    for (final sale in sales) {
+      final saleDate = sale['date'] is DateTime
+          ? (sale['date'] as DateTime)
+          : DateTime.now();
+      final sDate = DateTime(saleDate.year, saleDate.month, saleDate.day);
+
+      int sPetit =
+          (sale['format_petit'] as num?)?.toInt() ??
+          (sale['qtyPetit'] as num?)?.toInt() ??
+          0;
+      int sMoyen =
+          (sale['format_moyen'] as num?)?.toInt() ??
+          (sale['qtyMoyen'] as num?)?.toInt() ??
+          0;
+      int sGros =
+          (sale['format_gros'] as num?)?.toInt() ??
+          (sale['qtyGros'] as num?)?.toInt() ??
+          0;
+      int sPlus =
+          (sale['format_plus_gros'] as num?)?.toInt() ??
+          (sale['qtyPlusGros'] as num?)?.toInt() ??
+          0;
+
+      final items = sale['items'] is List ? (sale['items'] as List) : [];
+      if (items.isNotEmpty) {
+        sPetit = 0;
+        sMoyen = 0;
+        sGros = 0;
+        sPlus = 0;
+        for (final it in items) {
+          final calibre = (it['calibre'] ?? it['name'] ?? '')
+              .toString()
+              .toLowerCase();
+          final q = (it['quantity'] as num?)?.toInt() ?? 0;
+          if (calibre.contains('plus')) {
+            sPlus += q;
+          } else if (calibre.contains('gros')) {
+            sGros += q;
+          } else if (calibre.contains('petit')) {
+            sPetit += q;
+          } else {
+            sMoyen += q;
+          }
+        }
+      }
+
+      if (sPetit == 0 && sMoyen == 0 && sGros == 0 && sPlus == 0) {
+        final details = (sale['details'] ?? '').toString().toLowerCase();
+        final amt = (sale['amount'] as num?)?.toInt() ?? 0;
+        final qTotal =
+            (sale['quantity_plates'] as num?)?.toInt() ??
+            (sale['quantity'] as num?)?.toInt() ??
+            (amt > 0 ? (amt / 2200).round() : 10);
+        final displayQ = qTotal > 0 ? qTotal : 10;
+
+        if (details.contains('plus')) {
+          sPlus += displayQ;
+        } else if (details.contains('gros')) {
+          sGros += displayQ;
+        } else if (details.contains('petit')) {
+          sPetit += displayQ;
+        } else if (details.contains('moyen')) {
+          sMoyen += displayQ;
+        } else {
+          final int pM = (displayQ * 0.40).round();
+          final int pG = (displayQ * 0.30).round();
+          final int pP = (displayQ * 0.15).round();
+          final int pSmall = (displayQ - (pM + pG + pP)).clamp(0, 10000);
+          sMoyen += pM > 0 ? pM : 1;
+          sGros += pG;
+          sPlus += pP;
+          sPetit += pSmall;
+        }
+      }
+
+      final int saleTotalPlates = sPetit + sMoyen + sGros + sPlus;
+
+      for (int i = 0; i < 7; i++) {
+        if (sDate.isAtSameMomentAs(last7Days[i])) {
+          dayPlates[i] = (dayPlates[i] ?? 0) + saleTotalPlates;
+        }
+      }
+
+      totalPetit += sPetit;
+      totalMoyen += sMoyen;
+      totalGros += sGros;
+      totalPlusGros += sPlus;
+    }
+
+    int maxPlates = 1;
+    for (final p in dayPlates.values) {
+      if (p > maxPlates) maxPlates = p;
+    }
+
+    final int totalPlatesAll =
+        totalPetit + totalMoyen + totalGros + totalPlusGros;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RÉPARTITION GRAPHIQUE',
+                    style: AppTypography.labelSmall,
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Volume des 7 derniers jours (Plateaux de 30)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.inkSoft,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: Icon(
+                  _showGraphBreakdown
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  size: 20,
+                  color: AppColors.inkSoft,
+                ),
+                onPressed: () =>
+                    setState(() => _showGraphBreakdown = !_showGraphBreakdown),
+              ),
+            ],
+          ),
+          if (_showGraphBreakdown) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 140,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(7, (i) {
+                  final dayDate = last7Days[i];
+                  final weekdayIndex = (dayDate.weekday - 1) % 7;
+                  final label = dayLabels[weekdayIndex];
+                  final count = dayPlates[i] ?? 0;
+                  final heightFactor = (count / maxPlates).clamp(0.08, 1.0);
+                  final isToday = i == 6;
+
+                  return _buildDailyBar(heightFactor, label, isToday, count);
+                }),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: AppColors.line),
+            const SizedBox(height: 12),
+            const Text(
+              'RÉPARTITION PAR CALIBRE (PÉRIODE)',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: AppColors.inkSoft,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildFormatChip(
+                    'Plus Gros',
+                    totalPlusGros,
+                    totalPlatesAll,
+                    AppColors.danger,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildFormatChip(
+                    'Gros',
+                    totalGros,
+                    totalPlatesAll,
+                    AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildFormatChip(
+                    'Moyen',
+                    totalMoyen,
+                    totalPlatesAll,
+                    AppColors.primaryDark,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildFormatChip(
+                    'Petit',
+                    totalPetit,
+                    totalPlatesAll,
+                    AppColors.accent,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyBar(
+    double heightFactor,
+    String label,
+    bool isToday,
+    int plateCount,
+  ) {
+    Color barColor = isToday ? AppColors.accent : AppColors.primary;
+    if (plateCount == 0) barColor = AppColors.line;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Text(
+          '$plateCount pl.',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: isToday
+                ? AppColors.accent
+                : (plateCount > 0 ? AppColors.primaryDark : AppColors.inkSoft),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 80 * heightFactor,
+          width: 18,
+          decoration: BoxDecoration(
+            color: barColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: isToday ? AppColors.accent : AppColors.inkSoft,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormatChip(String label, int plates, int totalAll, Color color) {
+    final double pct = totalAll > 0 ? (plates / totalAll * 100) : 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$plates pl.',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: AppColors.ink,
+            ),
+          ),
+          Text(
+            '${pct.toStringAsFixed(0)}%',
+            style: const TextStyle(fontSize: 9, color: AppColors.inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String title, String val) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(color: Colors.white70, fontSize: 10),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          val,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatCurrency(num value) {
+    final str = value.toInt().toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i > 0) {
+        buffer.write(' ');
+      }
+    }
+    return buffer.toString().split('').reversed.join('');
+  }
+
+  String _getPeriodLabel() {
+    switch (_salesPeriodFilter) {
+      case 'today':
+        return "Ventes d'aujourd'hui";
+      case '7j':
+        return 'Ventes (7 derniers jours)';
+      case '30j':
+        return 'Ventes du mois en cours';
+      case 'custom':
+        if (_selectedDateRange != null) {
+          return 'Ventes du ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}';
+        }
+        return 'Ventes (Période personnalisée)';
+      default:
+        return 'Ventes cumulées (Global)';
+    }
   }
 
   Widget _buildCalculationRow(
