@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class D1DashboardView extends StatelessWidget {
@@ -27,7 +29,7 @@ class D1DashboardView extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               const Text(
-                'Synchronisé à 9:38',
+                'Synchronisation en temps réel active',
                 style: TextStyle(fontSize: 10.5, color: AppColors.inkSoft),
               ),
             ],
@@ -74,28 +76,65 @@ class D1DashboardView extends StatelessWidget {
           const SizedBox(height: 20),
 
           // Active Alerts
-          const Text('ALERTES ACTIVES', style: AppTypography.labelSmall),
-          const SizedBox(height: 9),
-          AlertRow(
-            title: 'Rupture de stock',
-            subtitle: 'Aliment démarrage sous le seuil',
-            type: AlertType.error,
-            onTap: () => _showAlertDetail(
-              context,
-              'Rupture de stock',
-              'L\'aliment démarrage a franchi son seuil critique.\nIl ne reste plus que 3 sacs disponibles en magasin.\n\nAction : Une commande urgente auprès d\'Avicola SARL doit être passée.',
-            ),
-          ),
-          const SizedBox(height: 8),
-          AlertRow(
-            title: 'Échéance',
-            subtitle: 'Seydou Yao — 65 000 FCFA, en retard',
-            type: AlertType.warning,
-            onTap: () => _showAlertDetail(
-              context,
-              'Échéance de paiement',
-              'Le client Seydou Yao (Grossiste) a un solde débiteur de 65 000 FCFA.\nL\'échéance fixée était le 12/08/2026.\n\nStatut actuel : En retard de paiement.',
-            ),
+          Consumer<SystemNotificationService>(
+            builder: (context, notifService, _) {
+              final alerts = notifService.activeAlerts;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('ALERTES ACTIVES', style: AppTypography.labelSmall),
+                      if (alerts.isNotEmpty)
+                        Text(
+                          '${alerts.length} alerte${alerts.length > 1 ? 's' : ''}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.danger,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  if (alerts.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Aucune alerte critique pour le moment.',
+                        style: TextStyle(fontSize: 12, color: AppColors.primaryDark),
+                      ),
+                    )
+                  else
+                    ...alerts.take(3).map((alert) {
+                      AlertType type = AlertType.error;
+                      if (alert.type == 'credit' || alert.type == 'late') {
+                        type = AlertType.warning;
+                      } else if (alert.type == 'task' || alert.type == 'reception') {
+                        type = AlertType.info;
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AlertRow(
+                          title: alert.title,
+                          subtitle: alert.message,
+                          type: type,
+                          onTap: () {
+                            notifService.markAsRead(alert.id);
+                            _showAlertDetail(context, alert.title, alert.message);
+                          },
+                        ),
+                      );
+                    }),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
 
@@ -132,7 +171,7 @@ class D1DashboardView extends StatelessWidget {
             children: [
               const Icon(Icons.info_outline, color: AppColors.primaryDark),
               const SizedBox(width: 8),
-              Text(title),
+              Expanded(child: Text(title)),
             ],
           ),
           content: Text(

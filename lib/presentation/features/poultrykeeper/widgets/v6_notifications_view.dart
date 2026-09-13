@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class V6NotificationsView extends StatelessWidget {
@@ -7,76 +9,113 @@ class V6NotificationsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        const Text(
-          'NOTIFICATIONS VOLAILLER (2 ACTIVES)',
-          style: AppTypography.labelSmall,
-        ),
-        const SizedBox(height: 9),
-        _buildNotificationRow(
-          context,
-          title: 'Tâche en retard',
-          desc: 'Vaccination Newcastle - Bât. C',
-          type: AlertType.error,
-          unread: true,
-          details: 'La tâche "Vaccination Newcastle" planifiée à 08:00 pour le Bâtiment C est en retard de plus de 2 heures.',
-        ),
-        _buildNotificationRow(
-          context,
-          title: 'Nouvelle tâche',
-          desc: 'Pesée hebdomadaire - Bât. B',
-          type: AlertType.info,
-          unread: true,
-          details: 'Une nouvelle tâche "Pesée hebdomadaire" a été programmée par le Technicien pour aujourd\'hui à 16:00.',
-        ),
-      ],
-    );
-  }
+    return Consumer<SystemNotificationService>(
+      builder: (context, notifService, _) {
+        final notifications = notifService.notifications;
+        final unreadCount = notifService.unreadCount;
 
-  Widget _buildNotificationRow(
-    BuildContext context, {
-    required String title,
-    required String desc,
-    required AlertType type,
-    required bool unread,
-    required String details,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: AlertRow(
-            title: title,
-            subtitle: desc,
-            type: type,
-            onTap: () => _showNotificationDetail(context, title, details),
-          ),
-        ),
-        if (unread) ...[
-          const SizedBox(width: 8),
-          Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
+        return ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'NOTIFICATIONS VOLAILLER ($unreadCount NON LUE${unreadCount > 1 ? 'S' : ''})',
+                  style: AppTypography.labelSmall,
+                ),
+                if (unreadCount > 0)
+                  GestureDetector(
+                    onTap: () => notifService.markAllAsRead(),
+                    child: const Text(
+                      'Tout marquer comme lu',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ],
+            const SizedBox(height: 12),
+            if (notifications.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Text(
+                    'Aucune notification volailler pour le moment.',
+                    style: TextStyle(color: AppColors.inkSoft),
+                  ),
+                ),
+              )
+            else
+              ...notifications.map((notif) {
+                AlertType alertType = AlertType.info;
+                if (notif.type.contains('alert') || notif.type == 'anomaly') {
+                  alertType = AlertType.error;
+                } else if (notif.type == 'credit' || notif.type == 'late') {
+                  alertType = AlertType.warning;
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: AlertRow(
+                          title: notif.title,
+                          subtitle: notif.message,
+                          type: alertType,
+                          onTap: () {
+                            notifService.markAsRead(notif.id);
+                            _showNotificationDetail(
+                              context,
+                              notif.title,
+                              notif.message,
+                              _formatTime(notif.timestamp),
+                            );
+                          },
+                        ),
+                      ),
+                      if (!notif.isRead) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+          ],
+        );
+      },
     );
   }
 
-  void _showNotificationDetail(BuildContext context, String title, String details) {
+  void _showNotificationDetail(
+    BuildContext context,
+    String title,
+    String details,
+    String time,
+  ) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Row(
             children: [
-              const Icon(Icons.notifications_active_outlined, color: AppColors.primaryDark),
+              const Icon(
+                Icons.notifications_active_outlined,
+                color: AppColors.primaryDark,
+              ),
               const SizedBox(width: 8),
               const Text('Détails'),
             ],
@@ -87,13 +126,18 @@ class V6NotificationsView extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Reçu à $time',
+                style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
               ),
               const SizedBox(height: 12),
-              Text(
-                details,
-                style: const TextStyle(fontSize: 13, height: 1.4),
-              ),
+              Text(details, style: const TextStyle(fontSize: 13, height: 1.4)),
             ],
           ),
           actions: [
@@ -105,5 +149,9 @@ class V6NotificationsView extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _formatTime(DateTime dt) {
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }

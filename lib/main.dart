@@ -7,6 +7,7 @@ import 'config/theme/app_theme.dart';
 import 'core/di/service_locator.dart';
 import 'core/services/offline_sync_service.dart';
 import 'core/services/socket_client_service.dart';
+import 'core/services/system_notification_service.dart';
 import 'core/utils/app_logger.dart';
 import 'data/datasources/local/local_storage.dart';
 import 'domain/repositories/authentication_repository.dart';
@@ -57,6 +58,7 @@ class FermeTrackApp extends StatelessWidget {
         ),
         ChangeNotifierProvider.value(value: getIt<OfflineSyncService>()),
         ChangeNotifierProvider.value(value: getIt<SocketClientService>()),
+        ChangeNotifierProvider.value(value: getIt<SystemNotificationService>()),
         ChangeNotifierProvider(create: (_) => ActivitiesProvider()),
         ChangeNotifierProvider(create: (_) => BuildingsProvider()),
         ChangeNotifierProvider(create: (_) => StocksProvider()),
@@ -187,15 +189,24 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
 
         if (authNotifier.isLoggedIn && authNotifier.currentUser != null) {
           if (authNotifier.sessionInfo != null) {
-            getIt<SocketClientService>().connect(
-              token: authNotifier.sessionInfo!.accessToken,
-              farmId: authNotifier.currentUser!.farmId,
-            );
+            final token = authNotifier.sessionInfo!.accessToken;
+            final farmId = authNotifier.currentUser!.farmId;
+            final role = authNotifier.currentUser!.role;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              getIt<SocketClientService>().connect(
+                token: token,
+                farmId: farmId,
+              );
+              getIt<SystemNotificationService>().setUserRole(role);
+              getIt<SystemNotificationService>().requestPermissions();
+            });
           }
           // Navigate based on role
           return _buildHomeScreen(authNotifier.currentUser!.role);
         } else {
-          getIt<SocketClientService>().disconnect();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            getIt<SocketClientService>().disconnect();
+          });
         }
 
         return const LoginScreen();

@@ -1,0 +1,478 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import '../../../../../config/theme/app_theme.dart';
+import '../../../../../core/di/service_locator.dart';
+import '../../../../../data/datasources/remote/api_client.dart';
+import '../../../../shared/widgets/common_widgets.dart';
+
+class T2ActivitiesTab extends StatefulWidget {
+  final List<Map<String, dynamic>> activities;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+
+  const T2ActivitiesTab({
+    super.key,
+    required this.activities,
+    required this.isLoading,
+    required this.onRefresh,
+  });
+
+  @override
+  State<T2ActivitiesTab> createState() => _T2ActivitiesTabState();
+}
+
+class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
+  final ApiClient _apiClient = getIt<ApiClient>();
+  String _activitiesTab = 'in_progress'; // in_progress, pending_validation, done
+  String _selectedBuildingFilter = 'all'; // all, A, A1, B, B1, C, D, E, F
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredActivities = widget.activities.where((act) {
+      if (_selectedBuildingFilter != 'all' &&
+          act['building'] != _selectedBuildingFilter) {
+        return false;
+      }
+      if (_activitiesTab == 'pending_validation') {
+        return act['status'] == TaskStatus.pendingValidation;
+      }
+      if (_activitiesTab == 'done') {
+        return act['status'] == TaskStatus.done;
+      }
+      return act['status'] == TaskStatus.inProgress ||
+          act['status'] == TaskStatus.partial ||
+          act['status'] == TaskStatus.late ||
+          act['status'] == TaskStatus.todo;
+    }).toList()
+      ..sort(
+        (a, b) => (b['scheduledDate']?.toString() ?? '').compareTo(
+          a['scheduledDate']?.toString() ?? '',
+        ),
+      );
+
+    return Column(
+      children: [
+        // Sub tabs (En cours / A valider / Faite)
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFEFE7),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildSubTabButton(
+                    'En cours',
+                    _activitiesTab == 'in_progress',
+                    () => setState(() => _activitiesTab = 'in_progress'),
+                  ),
+                ),
+                Expanded(
+                  child: _buildSubTabButton(
+                    'A valider',
+                    _activitiesTab == 'pending_validation',
+                    () => setState(() => _activitiesTab = 'pending_validation'),
+                  ),
+                ),
+                Expanded(
+                  child: _buildSubTabButton(
+                    'Faite',
+                    _activitiesTab == 'done',
+                    () => setState(() => _activitiesTab = 'done'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Building filter row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip(
+                  'Tous Bât.',
+                  _selectedBuildingFilter == 'all',
+                  () => setState(() => _selectedBuildingFilter = 'all'),
+                ),
+                _buildFilterChip(
+                  'Bât. A',
+                  _selectedBuildingFilter == 'A',
+                  () => setState(() => _selectedBuildingFilter = 'A'),
+                ),
+                _buildFilterChip(
+                  'Bât. A1',
+                  _selectedBuildingFilter == 'A1',
+                  () => setState(() => _selectedBuildingFilter = 'A1'),
+                ),
+                _buildFilterChip(
+                  'Bât. B',
+                  _selectedBuildingFilter == 'B',
+                  () => setState(() => _selectedBuildingFilter = 'B'),
+                ),
+                _buildFilterChip(
+                  'Bât. B1',
+                  _selectedBuildingFilter == 'B1',
+                  () => setState(() => _selectedBuildingFilter = 'B1'),
+                ),
+                _buildFilterChip(
+                  'Bât. C',
+                  _selectedBuildingFilter == 'C',
+                  () => setState(() => _selectedBuildingFilter = 'C'),
+                ),
+                _buildFilterChip(
+                  'Bât. D',
+                  _selectedBuildingFilter == 'D',
+                  () => setState(() => _selectedBuildingFilter = 'D'),
+                ),
+                _buildFilterChip(
+                  'Bât. E',
+                  _selectedBuildingFilter == 'E',
+                  () => setState(() => _selectedBuildingFilter = 'E'),
+                ),
+                _buildFilterChip(
+                  'Bât. F',
+                  _selectedBuildingFilter == 'F',
+                  () => setState(() => _selectedBuildingFilter = 'F'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Main listings
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            children: [
+              const Text(
+                'ACTIVITÉS DE LA SEMAINE',
+                style: AppTypography.labelSmall,
+              ),
+              const SizedBox(height: 8),
+              if (widget.isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (filteredActivities.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'Aucune activité enregistrée.',
+                      style: TextStyle(color: AppColors.inkSoft),
+                    ),
+                  ),
+                ),
+              ...filteredActivities.map((act) {
+                IconData icon = Icons.task_alt;
+                final title = act['title'].toString().toLowerCase();
+                if (title.contains('aliment')) {
+                  icon = Icons.restaurant;
+                } else if (title.contains('ramassage') || title.contains('oeuf') || title.contains('œuf')) {
+                  icon = Icons.egg;
+                } else if (title.contains('vaccin') || title.contains('vitamine') || title.contains('deparasitant')) {
+                  icon = Icons.healing;
+                }
+
+                return TaskCard(
+                  icon: icon,
+                  title: act['title'] ?? 'Activité',
+                  meta:
+                      '${act['buildingName']} · ${act['responsibleName']} · ${act['scheduledDate']?.toString().split('T').first ?? ''} · ${act['meta']} - ${act['endTime'] ?? ''}',
+                  status: act['status'] ?? TaskStatus.todo,
+                  onTap: () {
+                    if (act['status'] == TaskStatus.pendingValidation) {
+                      _showValidationDialog(act);
+                    } else {
+                      _showActivityDetails(act);
+                    }
+                  },
+                );
+              }),
+              const SizedBox(height: 80),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubTabButton(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.paper : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? AppColors.primaryDark : AppColors.inkSoft,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryDark : AppColors.paper,
+          border: Border.all(
+            color: isSelected ? AppColors.primaryDark : AppColors.line,
+          ),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w500,
+            color: isSelected ? Colors.white : AppColors.inkSoft,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Verification Dialog for activities (Requires comment) ---
+  void _showValidationDialog(Map<String, dynamic> act) {
+    final commentController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(act['title'] ?? 'Validation de la tâche'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Assigné à : ${act['meta']}'),
+                const SizedBox(height: 8),
+                Text(
+                  'Date programmée : ${_formatActivityDate(act['scheduledDate'])}',
+                ),
+                Text(
+                  'Responsable : ${act['responsibleName'] ?? 'Non renseigné'}',
+                ),
+                Text('Bâtiment : ${act['buildingName'] ?? 'Non renseigné'}'),
+                Text('Début : ${act['startTime'] ?? 'Non renseigné'}'),
+                Text('Fin prévue : ${act['endTime'] ?? 'Non renseignée'}'),
+                const SizedBox(height: 8),
+                Text(
+                  'Instructions : "${act['notes'] ?? 'Aucun détail disponible.'}"',
+                ),
+                if (act['submittedNotes'] != null)
+                  Text(
+                    'Compte rendu du volailler :\n${_formatActivityNotes(act['submittedNotes'])}',
+                  ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Commentaire de réalisation (Requis) :',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: commentController,
+                  decoration: const InputDecoration(
+                    hintText: 'Ex : Réalisé conformément au protocole.',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (commentController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Un commentaire de réalisation est requis pour confirmer la tâche',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                await _confirmActivity(act, commentController.text.trim());
+              },
+              child: const Text('Confirmer la réalisation'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showActivityDetails(Map<String, dynamic> activity) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(activity['title'] as String? ?? 'Détails activité'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Date programmée : ${_formatActivityDate(activity['scheduledDate'])}',
+              ),
+              Text(
+                'Responsable : ${activity['responsibleName'] ?? 'Non renseigné'}',
+              ),
+              Text('Bâtiment : ${activity['buildingName'] ?? 'Non renseigné'}'),
+              Text(
+                'Heure de programmation : ${activity['startTime'] ?? 'Non renseignée'}',
+              ),
+              Text(
+                'Heure de fin prévue : ${activity['endTime'] ?? 'Non renseignée'}',
+              ),
+              Text(
+                'Soumise par le volailler : ${_formatActivityTimestamp(activity['submittedAt'])}',
+              ),
+              Text(
+                'Validée le : ${_formatActivityTimestamp(activity['completedAt'])}',
+              ),
+              const SizedBox(height: 12),
+              Text('Instructions : ${activity['notes'] ?? 'Aucun détail'}'),
+              if (activity['submittedNotes'] != null)
+                Text(
+                  'Compte rendu du volailler :\n${_formatActivityNotes(activity['submittedNotes'])}',
+                ),
+              if (activity['validationNotes'] != null)
+                Text(
+                  'Validation technicien :\n${_formatActivityNotes(activity['validationNotes'])}',
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmActivity(
+    Map<String, dynamic> activity,
+    String comment,
+  ) async {
+    final id = activity['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    showActionLoadingDialog(context, message: 'Validation en cours...');
+    try {
+      await _apiClient.post(
+        '/activities/$id/confirm',
+        queryParameters: {'comment': comment},
+      );
+      widget.onRefresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Activité "${activity['title']}" validée et confirmée !',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Validation impossible : $error')),
+        );
+      }
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  String _formatActivityTimestamp(dynamic value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) return 'Non renseignée';
+    return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year} ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatActivityDate(dynamic value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) return 'Non renseignée';
+    return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
+  }
+
+  String _formatActivityNotes(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty) {
+      return 'Aucune information';
+    }
+    try {
+      final decoded = jsonDecode(value.toString());
+      if (decoded is Map) {
+        final lines = <String>[];
+        if (decoded['feedQtyKg'] != null) {
+          lines.add('Quantité distribuée : ${decoded['feedQtyKg']} kg');
+        }
+        if (decoded['eggsProduced'] != null) {
+          lines.add('Œufs produits : ${decoded['eggsProduced']}');
+        }
+        if (decoded['eggsBroken'] != null) {
+          lines.add('Œufs cassés : ${decoded['eggsBroken']}');
+        }
+        if (decoded['eggsUnsellable'] != null) {
+          lines.add('Œufs non vendables : ${decoded['eggsUnsellable']}');
+        }
+        if (decoded['eggsPlusGros'] != null) {
+          lines.add('Œufs plus gros : ${decoded['eggsPlusGros']}');
+        }
+        if (decoded['eggsGros'] != null) {
+          lines.add('Œufs gros : ${decoded['eggsGros']}');
+        }
+        if (decoded['eggsMoyen'] != null) {
+          lines.add('Œufs moyens : ${decoded['eggsMoyen']}');
+        }
+        if (decoded['eggsPetit'] != null) {
+          lines.add('Œufs petits : ${decoded['eggsPetit']}');
+        }
+        if (decoded['temperatureCelsius'] != null) {
+          lines.add(
+            'Température constatée : ${decoded['temperatureCelsius']} °C',
+          );
+        }
+        if (decoded['notes'] != null &&
+            decoded['notes'].toString().trim().isNotEmpty) {
+          lines.add('Observation : ${decoded['notes']}');
+        }
+        if (decoded['confirmed'] == true) {
+          lines.add('Confirmation : tâche réalisée');
+        }
+        return lines.join('\n');
+      }
+    } catch (_) {}
+    return value.toString();
+  }
+}

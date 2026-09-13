@@ -227,18 +227,26 @@ class OfflineSyncService extends ChangeNotifier {
   }
 
   void _invalidateCacheForEndpoint(String endpoint) {
-    if (endpoint.contains('/volailler/tasks')) {
+    final lower = endpoint.toLowerCase();
+    if (lower.contains('/volailler/tasks') || lower.contains('/activities')) {
       _cacheManager.invalidatePrefix('/volailler/tasks');
       _cacheManager.invalidatePrefix('/activities');
-    } else if (endpoint.contains('/activities')) {
-      _cacheManager.invalidatePrefix('/activities');
-      _cacheManager.invalidatePrefix('/volailler/tasks');
-    } else if (endpoint.contains('/buildings') || endpoint.contains('/batches')) {
+      _cacheManager.invalidatePrefix('/buildings');
+      _cacheManager.invalidatePrefix('/batches');
+    } else if (lower.contains('/buildings') || lower.contains('/batches')) {
       _cacheManager.invalidatePrefix('/buildings');
       _cacheManager.invalidatePrefix('/batches');
       _cacheManager.invalidatePrefix('/farms');
-    } else if (endpoint.contains('/magasinier')) {
+    } else if (lower.contains('/magasinier') || lower.contains('sale') || lower.contains('caisse')) {
       _cacheManager.invalidatePrefix('/magasinier');
+      _cacheManager.invalidatePrefix('/stocks');
+      _cacheManager.invalidatePrefix('/commercial/sales');
+    } else if (lower.contains('/order') || lower.contains('/stock')) {
+      _cacheManager.invalidatePrefix('/orders');
+      _cacheManager.invalidatePrefix('/stocks');
+      _cacheManager.invalidatePrefix('/activities');
+    } else {
+      _cacheManager.invalidatePrefix(endpoint);
     }
   }
 

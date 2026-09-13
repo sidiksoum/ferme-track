@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class D5D4SalesStockView extends StatefulWidget {
@@ -10,10 +12,72 @@ class D5D4SalesStockView extends StatefulWidget {
 }
 
 class _D5D4SalesStockViewState extends State<D5D4SalesStockView> {
+  final ApiClient _apiClient = getIt<ApiClient>();
   String _salesOrStockToggle = 'sales'; // sales, stock
   String _salesPeriodFilter = '7j'; // today, 7j, 30j, custom
   DateTimeRange? _selectedDateRange;
   String _stockSubTab = 'magasin'; // magasin, ferme
+
+  List<Map<String, dynamic>> _farmStockItems = [];
+  Map<String, int> _eggFormats = {
+    'plusGros': 0,
+    'gros': 0,
+    'moyen': 0,
+    'petit': 0,
+  };
+  bool _isLoadingStocks = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStocks();
+  }
+
+  Future<void> _loadStocks() async {
+    if (!mounted) return;
+    setState(() => _isLoadingStocks = true);
+    try {
+      final responses = await Future.wait([
+        _apiClient.get('/stocks', queryParameters: {'category': 'farm'}),
+        _apiClient.get('/magasinier/egg-exits'),
+      ]);
+
+      if (responses[0] is List) {
+        _farmStockItems = (responses[0] as List).whereType<Map>().map((item) {
+          final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+          final threshold = (item['alertThreshold'] as num?)?.toDouble() ?? 10.0;
+          final status = item['status']?.toString() ?? (qty <= 10.0 ? 'Critique' : (qty <= 25.0 ? 'Bas' : 'OK'));
+          final percent = (item['percent'] as num?)?.toDouble() ?? (qty / (threshold * 3)).clamp(0.05, 1.0);
+          return {
+            'name': item['name']?.toString() ?? 'Article',
+            'quantity': qty.toInt(),
+            'unit': item['unit']?.toString() ?? 'unités',
+            'status': status,
+            'percent': percent,
+          };
+        }).toList();
+      }
+
+      if (responses[1] is List) {
+        int plusGros = 0, gros = 0, moyen = 0, petit = 0;
+        for (final item in (responses[1] as List).whereType<Map>()) {
+          plusGros += (item['plusGros'] as num?)?.toInt() ?? 0;
+          gros += (item['gros'] as num?)?.toInt() ?? 0;
+          moyen += (item['moyen'] as num?)?.toInt() ?? 0;
+          petit += (item['petit'] as num?)?.toInt() ?? 0;
+        }
+        _eggFormats = {
+          'plusGros': plusGros,
+          'gros': gros,
+          'moyen': moyen,
+          'petit': petit,
+        };
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoadingStocks = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,62 +475,53 @@ class _D5D4SalesStockViewState extends State<D5D4SalesStockView> {
 
         if (_stockSubTab == 'magasin') ...[
           _buildEggStockItem(
+            'Nombre de plus gros œufs',
+            '${_eggFormats['plusGros'] ?? 0}',
+            '${((_eggFormats['plusGros'] ?? 0) / 30).floor()} plaquettes',
+            AppColors.danger,
+          ),
+          _buildEggStockItem(
             'Nombre de gros œufs',
-            '1 240',
-            '41 plaquettes',
+            '${_eggFormats['gros'] ?? 0}',
+            '${((_eggFormats['gros'] ?? 0) / 30).floor()} plaquettes',
             AppColors.primary,
           ),
           _buildEggStockItem(
-            'Nombre de petits œufs',
-            '980',
-            '32 plaquettes',
-            AppColors.primary,
-          ),
-          _buildEggStockItem(
-            'Nombre d œufs moyens',
-            '4 320',
-            '144 plaquettes',
+            'Nombre d’œufs moyens',
+            '${_eggFormats['moyen'] ?? 0}',
+            '${((_eggFormats['moyen'] ?? 0) / 30).floor()} plaquettes',
             AppColors.primaryDark,
           ),
           _buildEggStockItem(
-            'Nombre de plus gros œufs',
-            '620',
-            '21 plaquettes',
-            AppColors.danger,
-          ),
-        ] else ...[
-          _buildStockItem(
-            'Aliment ponte (Mangeoire)',
-            4,
-            'sacs',
-            'OK',
-            0.80,
-            AppColors.primary,
-          ),
-          _buildStockItem(
-            'Aliment croissance (Mangeoire)',
-            2,
-            'sacs',
-            'Bas',
-            0.40,
+            'Nombre de petits œufs',
+            '${_eggFormats['petit'] ?? 0}',
+            '${((_eggFormats['petit'] ?? 0) / 30).floor()} plaquettes',
             AppColors.accent,
           ),
-          _buildStockItem(
-            'Désinfectant',
-            15,
-            'litres',
-            'OK',
-            0.75,
-            AppColors.primary,
-          ),
-          _buildStockItem(
-            'Eau de boisson',
-            500,
-            'litres',
-            'OK',
-            0.90,
-            AppColors.primary,
-          ),
+        ] else ...[
+          if (_farmStockItems.isEmpty && !_isLoadingStocks)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 30),
+                child: Text('Aucun article de stock ferme enregistré.', style: TextStyle(color: AppColors.inkSoft)),
+              ),
+            )
+          else
+            ..._farmStockItems.map((item) {
+              final status = item['status']?.toString() ?? 'OK';
+              Color color = AppColors.primary;
+              if (status == 'Critique') color = AppColors.danger;
+              if (status == 'Bas') color = AppColors.accent;
+
+              return _buildStockItem(
+                item['name'],
+                item['quantity'],
+                item['unit'],
+                status,
+                (item['percent'] as num?)?.toDouble() ?? 0.5,
+                color,
+              );
+            }),
         ],
       ],
     );

@@ -19,7 +19,7 @@ class StockItem {
 }
 
 class StocksProvider extends ChangeNotifier {
-  final List<StockItem> _items = const [
+  List<StockItem> _items = const [
     StockItem(
       id: 'S-01',
       name: 'Aliment poulet',
@@ -62,7 +62,9 @@ class StocksProvider extends ChangeNotifier {
       category: current.category,
       lowStock: quantity < 10,
     );
-    // no direct mutation because list is const, but the provider API remains valid for future data layer
+    final mutable = List<StockItem>.from(_items);
+    mutable[index] = updated;
+    _items = mutable;
     notifyListeners();
   }
 }

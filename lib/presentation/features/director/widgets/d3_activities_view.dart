@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/socket_client_service.dart';
 import '../../../../data/datasources/remote/api_client.dart';
 import '../../../../config/theme/app_theme.dart';
 import '../../../shared/widgets/common_widgets.dart';
@@ -15,8 +16,11 @@ class D3ActivitiesView extends StatefulWidget {
 
 class _D3ActivitiesViewState extends State<D3ActivitiesView> {
   final ApiClient _apiClient = getIt<ApiClient>();
+  final SocketClientService _socketService = getIt<SocketClientService>();
+  StreamSubscription? _socketSubscription;
+
   List<Map<String, dynamic>> _activities = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   String _activitiesBuildingFilter = 'all'; // all, A, B, C
   String _activitiesTab = 'planned'; // planned, done
 
@@ -24,11 +28,35 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
   void initState() {
     super.initState();
     _loadActivities();
+
+    // Écoute temps réel Socket.IO pour actualisation en arrière-plan
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final evt = event['event']?.toString() ?? '';
+      if (evt.contains('task') || evt.contains('activit') || evt.contains('order') || evt.contains('anomal')) {
+        if (mounted) {
+          _loadActivities(forceRefresh: true);
+        }
+      }
+    });
   }
 
-  Future<void> _loadActivities() async {
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadActivities({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    if (_activities.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
-      final response = await _apiClient.get('/activities');
+      final response = await _apiClient.get(
+        '/activities',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
       if (!mounted || response is! List) return;
       setState(() {
         _activities =
@@ -60,6 +88,7 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
               ),
             );
       });
+    } catch (_) {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -151,40 +180,50 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
           else
             // List
             Expanded(
-              child: filtered.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Aucune activité pour ces filtres.',
-                        style: TextStyle(color: AppColors.inkSoft),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final act = filtered[index];
-                        IconData icon = Icons.task_alt;
-                        if (act['title'].toString().contains('Alimentation')) {
-                          icon = Icons.restaurant;
-                        } else if (act['title'].toString().contains(
-                          'Ramassage',
-                        )) {
-                          icon = Icons.egg;
-                        } else if (act['title'].toString().contains(
-                          'Vaccination',
-                        )) {
-                          icon = Icons.healing;
-                        }
+              child: RefreshIndicator(
+                onRefresh: () => _loadActivities(forceRefresh: true),
+                child: filtered.isEmpty
+                    ? ListView(
+                        children: const [
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Center(
+                              child: Text(
+                                'Aucune activité pour ces filtres.',
+                                style: TextStyle(color: AppColors.inkSoft),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final act = filtered[index];
+                          IconData icon = Icons.task_alt;
+                          if (act['title'].toString().contains('Alimentation')) {
+                            icon = Icons.restaurant;
+                          } else if (act['title'].toString().contains(
+                            'Ramassage',
+                          )) {
+                            icon = Icons.egg;
+                          } else if (act['title'].toString().contains(
+                            'Vaccination',
+                          )) {
+                            icon = Icons.healing;
+                          }
 
-                        return TaskCard(
-                          icon: icon,
-                          title: act['title'] as String,
-                          meta:
-                              '${act['buildingName']} · ${act['responsibleName']} · ${act['scheduledDate']?.toString().split('T').first ?? ''} · ${act['startTime'] ?? act['meta']} - ${act['endTime'] ?? ''}',
-                          status: act['status'] as TaskStatus,
-                          onTap: () => _showActivityDetail(context, act),
-                        );
-                      },
-                    ),
+                          return TaskCard(
+                            icon: icon,
+                            title: act['title'] as String,
+                            meta:
+                                '${act['buildingName']} · ${act['responsibleName']} · ${act['scheduledDate']?.toString().split('T').first ?? ''} · ${act['startTime'] ?? act['meta']} - ${act['endTime'] ?? ''}',
+                            status: act['status'] as TaskStatus,
+                            onTap: () => _showActivityDetail(context, act),
+                          );
+                        },
+                      ),
+              ),
             ),
         ],
       ),

@@ -39,9 +39,12 @@ class _V1TasksViewState extends State<V1TasksView> {
     _loadTasks();
 
     // Écouter les événements temps réel Socket.IO
-    _socketSubscription = _socketService.taskEvents.listen((event) {
-      if (mounted) {
-        _loadTasks(forceRefresh: true);
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final evt = event['event']?.toString() ?? '';
+      if (evt.contains('task') || evt.contains('activity')) {
+        if (mounted) {
+          _loadTasks(forceRefresh: true);
+        }
       }
     });
 
@@ -68,6 +71,9 @@ class _V1TasksViewState extends State<V1TasksView> {
   }
 
   Future<void> _loadTasks({bool forceRefresh = false}) async {
+    if (_tasks.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final response = await _apiClient.get(
         '/volailler/tasks',
@@ -75,42 +81,50 @@ class _V1TasksViewState extends State<V1TasksView> {
         useCache: true,
       );
       if (!mounted || response is! List) return;
+      final parsedTasks = response.whereType<Map>().map((rawItem) {
+        final item = Map<String, dynamic>.from(rawItem);
+        final status = item['status']?.toString();
+        return {
+          ...item,
+          'title': item['title']?.toString() ?? 'Tâche',
+          'meta': item['meta']?.toString() ?? '',
+          'buildingName':
+              item['buildingName']?.toString() ?? 'Bâtiment non renseigné',
+          'responsibleName':
+              item['responsibleName']?.toString() ??
+              'Responsable non renseigné',
+          'taskType': item['taskType']?.toString() ?? 'other',
+          'description': item['description']?.toString(),
+          'scheduledDate': item['scheduledDate']?.toString(),
+          'startTime': item['startTime']?.toString(),
+          'endTime': item['endTime']?.toString(),
+          'submittedAt': item['submittedAt']?.toString(),
+          'completedAt': item['completedAt']?.toString(),
+          'submittedNotes': item['submittedNotes']?.toString(),
+          'validationNotes': item['validationNotes']?.toString(),
+          'status': status == 'done'
+              ? TaskStatus.done
+              : status == 'pending_validation'
+              ? TaskStatus.pendingValidation
+              : TaskStatus.inProgress,
+          'icon': _iconFor(item['taskType']?.toString()),
+        };
+      }).toList();
+
       setState(() {
-        _tasks = response.whereType<Map>().map((rawItem) {
-          final item = Map<String, dynamic>.from(rawItem);
-          final status = item['status']?.toString();
-          return {
-            ...item,
-            'title': item['title']?.toString() ?? 'Tâche',
-            'meta': item['meta']?.toString() ?? '',
-            'buildingName':
-                item['buildingName']?.toString() ?? 'Bâtiment non renseigné',
-            'responsibleName':
-                item['responsibleName']?.toString() ??
-                'Responsable non renseigné',
-            'taskType': item['taskType']?.toString() ?? 'other',
-            'description': item['description']?.toString(),
-            'scheduledDate': item['scheduledDate']?.toString(),
-            'startTime': item['startTime']?.toString(),
-            'endTime': item['endTime']?.toString(),
-            'submittedAt': item['submittedAt']?.toString(),
-            'completedAt': item['completedAt']?.toString(),
-            'submittedNotes': item['submittedNotes']?.toString(),
-            'validationNotes': item['validationNotes']?.toString(),
-            'status': status == 'done'
-                ? TaskStatus.done
-                : status == 'pending_validation'
-                ? TaskStatus.pendingValidation
-                : TaskStatus.inProgress,
-            'icon': _iconFor(item['taskType']?.toString()),
-          };
-        }).toList();
+        _tasks = parsedTasks;
         _error = null;
+        _isLoading = false;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        setState(() {
+          _error = _tasks.isEmpty ? error.toString() : null;
+          _isLoading = false;
+        });
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && _isLoading) setState(() => _isLoading = false);
     }
   }
 

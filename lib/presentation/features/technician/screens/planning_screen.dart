@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../../../providers/auth_provider.dart';
 import '../../director/widgets/d6_notifications_view.dart';
@@ -38,15 +39,17 @@ class _PlanningScreenState extends State<PlanningScreen> {
               )
             : null,
         title: _isShowingNotifications
-            ? const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Notifications'),
-                  Text(
-                    'Alertes en attente (3 non lues)',
-                    style: AppTypography.appbarSubtitle,
-                  ),
-                ],
+            ? Consumer<SystemNotificationService>(
+                builder: (context, notifService, _) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Notifications'),
+                    Text(
+                      'Alertes (${notifService.unreadCount} non lue${notifService.unreadCount > 1 ? 's' : ''})',
+                      style: AppTypography.appbarSubtitle,
+                    ),
+                  ],
+                ),
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,48 +62,53 @@ class _PlanningScreenState extends State<PlanningScreen> {
                 ],
               ),
         actions: [
-          GestureDetector(
-            onTap: () => setState(() {
-              _isShowingNotifications = !_isShowingNotifications;
-            }),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Icon(
-                    Icons.notifications_none,
-                    size: 22,
-                    color: Colors.white,
-                  ),
-                  if (!_isShowingNotifications)
-                    Positioned(
-                      top: 10,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 12,
-                          minHeight: 12,
-                        ),
-                        child: const Text(
-                          '3',
-                          style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+          Consumer<SystemNotificationService>(
+            builder: (context, notifService, _) {
+              final unread = notifService.unreadCount;
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _isShowingNotifications = !_isShowingNotifications;
+                }),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(
+                        Icons.notifications_none,
+                        size: 22,
+                        color: Colors.white,
                       ),
-                    ),
-                ],
-              ),
-            ),
+                      if (!_isShowingNotifications && unread > 0)
+                        Positioned(
+                          top: 10,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 12,
+                              minHeight: 12,
+                            ),
+                            child: Text(
+                              unread > 99 ? '99+' : '$unread',
+                              style: const TextStyle(
+                                color: AppColors.primaryDark,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
@@ -188,31 +196,21 @@ class _PlanningScreenState extends State<PlanningScreen> {
     if (_isShowingNotifications) {
       return const D6NotificationsView();
     }
-    switch (_selectedNavIndex) {
-      case 0:
-        return T1AccueilView(
+    return IndexedStack(
+      index: _selectedNavIndex,
+      children: [
+        T1AccueilView(
           onViewNotifications: () {
             setState(() {
               _isShowingNotifications = true;
             });
           },
-        );
-      case 1:
-        return const T2ActivitiesOrdersView();
-      case 2:
-        return const T3StockView();
-      case 3:
-        return const T4StatsView();
-      case 4:
-        return const T5GestionView();
-      default:
-        return T1AccueilView(
-          onViewNotifications: () {
-            setState(() {
-              _isShowingNotifications = true;
-            });
-          },
-        );
-    }
+        ),
+        const T2ActivitiesOrdersView(),
+        const T3StockView(),
+        const T4StatsView(),
+        const T5GestionView(),
+      ],
+    );
   }
 }

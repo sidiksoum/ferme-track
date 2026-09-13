@@ -7,6 +7,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/interfaces/network_checker.dart';
 import '../../../../core/services/offline_sync_service.dart';
 import '../../../../data/datasources/remote/api_client.dart';
+import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/v1_tasks_view.dart';
@@ -60,13 +61,52 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            tooltip: 'Notifications',
-            onPressed: () {
-              setState(() {
-                _isShowingNotifications = !_isShowingNotifications;
-              });
+          Consumer<SystemNotificationService>(
+            builder: (context, notifService, _) {
+              final unread = notifService.unreadCount;
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _isShowingNotifications = !_isShowingNotifications;
+                }),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(
+                        Icons.notifications_none,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                      if (!_isShowingNotifications && unread > 0)
+                        Positioned(
+                          top: 10,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 12,
+                              minHeight: 12,
+                            ),
+                            child: Text(
+                              unread > 99 ? '99+' : '$unread',
+                              style: const TextStyle(
+                                color: AppColors.primaryDark,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
             },
           ),
           IconButton(
@@ -159,34 +199,23 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
     if (_isShowingNotifications) {
       return const V6NotificationsView();
     }
-    switch (_selectedNavIndex) {
-      case 0:
-        return V1TasksView(
-          onSelectTask: (task) {
+    return IndexedStack(
+      index: _selectedNavIndex,
+      children: [
+        V1TasksView(
+          onSelectTask: (task) async {
             if (task['status'] == TaskStatus.done ||
                 task['status'] == TaskStatus.pendingValidation) {
               _showTaskDetails(context, task);
-              return Future.value(false);
+              return false;
             }
-            return _showCloseTaskDialog(context, task);
+            return await _showCloseTaskDialog(context, task);
           },
-        );
-      case 1:
-        return const V3V6AnomalyView();
-      case 2:
-        return _buildAnomaliesHistory();
-      default:
-        return V1TasksView(
-          onSelectTask: (task) {
-            if (task['status'] == TaskStatus.done ||
-                task['status'] == TaskStatus.pendingValidation) {
-              _showTaskDetails(context, task);
-              return Future.value(false);
-            }
-            return _showCloseTaskDialog(context, task);
-          },
-        );
-    }
+        ),
+        const V3V6AnomalyView(),
+        _buildAnomaliesHistory(),
+      ],
+    );
   }
 
   Widget _buildAnomaliesHistory() {
@@ -293,7 +322,7 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
     BuildContext context,
     Map<String, dynamic> task,
   ) async {
-    return await showDialog<bool>(
+    final result = await showDialog<bool>(
           context: context,
           barrierDismissible: true,
           builder: (dialogContext) {
@@ -307,27 +336,27 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(dialogContext),
+                    onPressed: () => Navigator.pop(dialogContext, false),
                   ),
                 ],
               ),
-              content: Container(
+              content: SizedBox(
                 width: double.maxFinite,
                 child: V2CloseTaskView(
                   selectedTask: task,
-                  onCancel: () => Navigator.pop(dialogContext),
+                  onCancel: () => Navigator.pop(dialogContext, false),
                   onDone: (payload) async {
                     final success = await _closeTask(task, payload);
-                    if (success && dialogContext.mounted) {
-                      Navigator.pop(dialogContext, true);
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext, success);
                     }
                   },
                 ),
               ),
             );
           },
-        ) ??
-        false;
+        );
+    return result ?? false;
   }
 
   void _showTaskDetails(BuildContext context, Map<String, dynamic> task) {

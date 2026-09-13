@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/socket_client_service.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 
 class M1AccueilSalesView extends StatefulWidget {
   final String userName;
@@ -11,11 +15,29 @@ class M1AccueilSalesView extends StatefulWidget {
 }
 
 class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
-  String _toggleMode = 'sales'; // sales, stock
-  String _periodFilter = '7j'; // today, 7j, 30j, custom
-  DateTimeRange? _selectedDateRange;
+  final ApiClient _apiClient = getIt<ApiClient>();
+  final SocketClientService _socketService = getIt<SocketClientService>();
+  StreamSubscription? _socketSubscription;
 
-  final List<Map<String, dynamic>> _receivables = [
+  String _toggleMode = 'sales'; // sales, stock
+  final String _periodFilter = 'today'; // today, 7j, 30j, custom
+
+  Map<String, int> _eggFormats = {
+    'plusGros': 0,
+    'gros': 0,
+    'moyen': 0,
+    'petit': 0,
+  };
+
+  Map<String, dynamic> _caisseStats = {
+    'today_sales': 45000,
+    'total_sales': 245000,
+    'cash_sales': 178000,
+    'credit_sales': 67000,
+    'total_receivables': 126500,
+  };
+
+  List<Map<String, dynamic>> _receivables = [
     {
       'client': 'Seydou Yao',
       'contact': '07 47 48 49 50',
@@ -50,6 +72,134 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
       'status': 'Échéance à venir',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+
+    // Écoute temps réel Socket.IO pour rafraîchissement instantané
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final eventName = event['event']?.toString() ?? '';
+      if (eventName == 'sale:created' ||
+          eventName == 'stock:updated' ||
+          eventName.contains('reception')) {
+        if (mounted) {
+          _loadDashboardData(forceRefresh: true);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadDashboardData({bool forceRefresh = false}) async {
+    await Future.wait([
+      _loadEggStocks(forceRefresh: forceRefresh),
+      _loadCaisseStats(forceRefresh: forceRefresh),
+      _loadReceivables(forceRefresh: forceRefresh),
+    ]);
+  }
+
+  Future<void> _loadEggStocks({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    try {
+      final response = await _apiClient.get(
+        '/magasinier/egg-stocks',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (mounted && response is Map<String, dynamic>) {
+        setState(() {
+          _eggFormats = {
+            'plusGros': (response['plusGros'] as num?)?.toInt() ?? 0,
+            'gros': (response['gros'] as num?)?.toInt() ?? 0,
+            'moyen': (response['moyen'] as num?)?.toInt() ?? 0,
+            'petit': (response['petit'] as num?)?.toInt() ?? 0,
+          };
+        });
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      final response = await _apiClient.get(
+        '/magasinier/egg-exits',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (!mounted || response is! List) return;
+
+      int plusGros = 0, gros = 0, moyen = 0, petit = 0;
+      for (final item in response.whereType<Map>()) {
+        if (item['status'] == 'validated') {
+          plusGros += (item['plusGros'] as num?)?.toInt() ?? 0;
+          gros += (item['gros'] as num?)?.toInt() ?? 0;
+          moyen += (item['moyen'] as num?)?.toInt() ?? 0;
+          petit += (item['petit'] as num?)?.toInt() ?? 0;
+        }
+      }
+
+      setState(() {
+        _eggFormats = {
+          'plusGros': plusGros,
+          'gros': gros,
+          'moyen': moyen,
+          'petit': petit,
+        };
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadCaisseStats({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    try {
+      final response = await _apiClient.get(
+        '/magasinier/caisse',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (mounted && response is Map<String, dynamic>) {
+        setState(() {
+          _caisseStats = response;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadReceivables({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    try {
+      final response = await _apiClient.get(
+        '/magasinier/clients/debtors',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (mounted && response is List && response.isNotEmpty) {
+        setState(() {
+          _receivables = response.map<Map<String, dynamic>>((r) {
+            final due = (r['due'] as num?)?.toInt() ?? (r['balance'] as num?)?.toInt() ?? 0;
+            final isOverdue = r['isOverdue'] == true || (r['status']?.toString().contains('dépassée') ?? false);
+            return {
+              'client': r['name']?.toString() ?? 'Client',
+              'contact': r['phone']?.toString() ?? '—',
+              'address': r['address']?.toString() ?? '—',
+              'saleDetails': 'Solde débiteur restant',
+              'total': due,
+              'paid': 0,
+              'due': due,
+              'dueDate': r['dueDate']?.toString() ?? '15/09/2026',
+              'status': isOverdue ? 'Échéance dépassée' : 'Échéance à venir',
+            };
+          }).toList();
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,11 +251,15 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
         ),
 
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: _toggleMode == 'sales'
-                ? _buildSalesSummary()
-                : _buildStockSummary(),
+          child: RefreshIndicator(
+            onRefresh: _loadDashboardData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: _toggleMode == 'sales'
+                  ? _buildSalesSummary()
+                  : _buildStockSummary(),
+            ),
           ),
         ),
       ],
@@ -113,6 +267,12 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
   }
 
   Widget _buildSalesSummary() {
+    final todaySales = _caisseStats['today_sales'] ?? 45000;
+    final totalSales = _caisseStats['total_sales'] ?? 245000;
+    final cashSales = _caisseStats['cash_sales'] ?? 178000;
+    final creditSales = _caisseStats['credit_sales'] ?? 67000;
+    final totalReceivables = _caisseStats['total_receivables'] ?? 126500;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -139,7 +299,7 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
               ),
               const SizedBox(height: 2),
               Text(
-                _periodFilter == 'today' ? '45 000 FCFA' : '245 000 FCFA',
+                _periodFilter == 'today' ? '$todaySales FCFA' : '$totalSales FCFA',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -152,16 +312,22 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSummaryItem('Comptant', '178 000'),
-                  _buildSummaryItem('Crédit', '67 000'),
-                  _buildSummaryItem('Créances tot.', '126 500'),
+                  _buildSummaryItem('Comptant', '$cashSales FCFA'),
+                  _buildSummaryItem('Crédit', '$creditSales FCFA'),
+                  _buildSummaryItem('Créances tot.', '$totalReceivables FCFA'),
                 ],
               ),
             ],
           ),
         ),
         const SizedBox(height: 20),
-        const Text('PLUS GROSSES CRÉANCES', style: AppTypography.labelSmall),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('PLUS GROSSES CRÉANCES', style: AppTypography.labelSmall),
+            Text('${_receivables.length} clients', style: const TextStyle(fontSize: 11, color: AppColors.inkSoft)),
+          ],
+        ),
         const SizedBox(height: 9),
         ..._receivables.map(_buildReceivableCard),
       ],
@@ -287,28 +453,28 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
         ),
         const SizedBox(height: 12),
         _buildEggStockItem(
-          'Nombre de gros œufs',
-          '1 240',
-          '41 plaquettes',
-          AppColors.primary,
+          'Nombre de plus gros œufs',
+          '${_eggFormats['plusGros'] ?? 0}',
+          '${((_eggFormats['plusGros'] ?? 0) / 30).floor()} plaquettes',
+          AppColors.danger,
         ),
         _buildEggStockItem(
-          'Nombre de petits œufs',
-          '980',
-          '32 plaquettes',
+          'Nombre de gros œufs',
+          '${_eggFormats['gros'] ?? 0}',
+          '${((_eggFormats['gros'] ?? 0) / 30).floor()} plaquettes',
           AppColors.primary,
         ),
         _buildEggStockItem(
           'Nombre d’œufs moyens',
-          '4 320',
-          '144 plaquettes',
+          '${_eggFormats['moyen'] ?? 0}',
+          '${((_eggFormats['moyen'] ?? 0) / 30).floor()} plaquettes',
           AppColors.primaryDark,
         ),
         _buildEggStockItem(
-          'Nombre de plus gros œufs',
-          '620',
-          '21 plaquettes',
-          AppColors.danger,
+          'Nombre de petits œufs',
+          '${_eggFormats['petit'] ?? 0}',
+          '${((_eggFormats['petit'] ?? 0) / 30).floor()} plaquettes',
+          AppColors.accent,
         ),
       ],
     );
@@ -375,88 +541,6 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
     );
   }
 
-  Widget _buildStockItem(
-    String name,
-    int quantity,
-    String unit,
-    String status,
-    double percent,
-    Color progressColor,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.paper,
-          border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13.5,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: progressColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      color: progressColor == AppColors.primary
-                          ? AppColors.primaryDark
-                          : progressColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '$quantity $unit disponibles',
-              style: const TextStyle(color: AppColors.inkSoft, fontSize: 11.5),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 6,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAEAE3),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: percent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: progressColor,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSubTabButton(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -473,30 +557,6 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             color: isSelected ? AppColors.primaryDark : AppColors.inkSoft,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPeriodChip(String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryDark : AppColors.paper,
-          border: Border.all(
-            color: isSelected ? AppColors.primaryDark : AppColors.line,
-          ),
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : AppColors.inkSoft,
           ),
         ),
       ),
@@ -522,9 +582,5 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
         ),
       ],
     );
-  }
-
-  String _formatDate(DateTime dt) {
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 }

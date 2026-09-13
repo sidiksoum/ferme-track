@@ -12,6 +12,7 @@ import '../../../domain/repositories/user_repository.dart';
 import '../interfaces/network_checker.dart';
 import '../services/offline_sync_service.dart';
 import '../services/socket_client_service.dart';
+import '../services/system_notification_service.dart';
 
 final getIt = GetIt.instance;
 
@@ -116,6 +117,13 @@ class ServiceLocator {
       networkChecker: getIt<NetworkChecker>(),
     );
     getIt.registerSingleton<SocketClientService>(socketClientService);
+
+    // System Notification Service (Push + Real-time Alert Dispatcher)
+    final systemNotificationService = SystemNotificationService(
+      socketService: socketClientService,
+    );
+    await systemNotificationService.initialize();
+    getIt.registerSingleton<SystemNotificationService>(systemNotificationService);
   }
 
   /// Setup use cases

@@ -1,43 +1,86 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
-import '../../../shared/widgets/common_widgets.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/socket_client_service.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 
-class M5CaisseView extends StatelessWidget {
+class M5CaisseView extends StatefulWidget {
   const M5CaisseView({super.key});
 
   @override
+  State<M5CaisseView> createState() => _M5CaisseViewState();
+}
+
+class _M5CaisseViewState extends State<M5CaisseView> {
+  final ApiClient _apiClient = getIt<ApiClient>();
+  final SocketClientService _socketService = getIt<SocketClientService>();
+  StreamSubscription? _socketSubscription;
+
+  Map<String, dynamic> _caisseStats = {
+    'today_sales': 45000,
+    'total_sales': 245000,
+    'cash_sales': 178000,
+    'credit_sales': 67000,
+    'total_receivables': 126500,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCaisseData();
+
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final evt = event['event']?.toString() ?? '';
+      if (evt == 'sale:created' || evt == 'stock:updated' || evt.contains('refund')) {
+        if (mounted) {
+          _loadCaisseData(forceRefresh: true);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadCaisseData({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    try {
+      final response = await _apiClient.get(
+        '/magasinier/caisse',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (mounted && response is Map<String, dynamic>) {
+        setState(() {
+          _caisseStats = response;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Mock cash movements
+    final int todaySales = (_caisseStats['today_sales'] as num?)?.toInt() ?? 0;
+    final int cashSales = (_caisseStats['cash_sales'] as num?)?.toInt() ?? (_caisseStats['total_sales'] as num?)?.toInt() ?? 0;
+    final int creditSales = (_caisseStats['credit_sales'] as num?)?.toInt() ?? 0;
+    final int totalReceivables = (_caisseStats['total_receivables'] as num?)?.toInt() ?? 0;
+
     final movements = [
       {
-        'label': 'Vente alvéoles Moyen',
-        'type': 'in', // income
-        'amount': 18000,
-        'time': 'Aujourd\'hui · 14:20',
-      },
-      {
-        'label': 'Remboursement Seydou Yao',
+        'label': 'Ventes du jour (Espèces/MOMo)',
         'type': 'in',
-        'amount': 20000,
-        'time': 'Aujourd\'hui · 11:15',
+        'amount': todaySales,
+        'time': 'Aujourd\'hui · En direct',
       },
       {
-        'label': 'Achat désinfectant Bâtiment C',
-        'type': 'out', // expense
-        'amount': 15000,
-        'time': 'Aujourd\'hui · 09:30',
-      },
-      {
-        'label': 'Vente Poulets vifs',
-        'type': 'in',
-        'amount': 82000,
-        'time': 'Hier · 16:45',
-      },
-      {
-        'label': 'Paiement transport d\'aliments',
-        'type': 'out',
-        'amount': 20000,
-        'time': 'Hier · 10:00',
+        'label': 'Total créances clients en cours',
+        'type': 'credit',
+        'amount': totalReceivables,
+        'time': 'À recouvrer',
       },
     ];
 
@@ -61,13 +104,13 @@ class M5CaisseView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Solde en caisse actuel',
+                  'Solde cumulé en caisse',
                   style: TextStyle(color: Colors.white70, fontSize: 11.5),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  '485 000 FCFA',
-                  style: TextStyle(
+                Text(
+                  '$cashSales FCFA',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -79,9 +122,9 @@ class M5CaisseView extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildCashSummaryItem('Encaissements (MM/Esp)', '+120 000'),
-                    _buildCashSummaryItem('Décaissements', '-35 000'),
-                    _buildCashSummaryItem('Solde net jour', '+85 000'),
+                    _buildCashSummaryItem('Ventes du jour', '+$todaySales FCFA'),
+                    _buildCashSummaryItem('À crédit', '$creditSales FCFA'),
+                    _buildCashSummaryItem('Créances totales', '$totalReceivables FCFA'),
                   ],
                 ),
               ],
@@ -95,7 +138,7 @@ class M5CaisseView extends StatelessWidget {
             children: const [
               Text('JOURNAL DE CAISSE DU JOUR', style: AppTypography.labelSmall),
               Text(
-                'Voir tout',
+                'En direct',
                 style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ],
@@ -116,13 +159,13 @@ class M5CaisseView extends StatelessWidget {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: isIn ? AppColors.successLight : AppColors.errorLight,
+                      color: isIn ? AppColors.successLight : AppColors.warningLight,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isIn ? Icons.arrow_downward : Icons.arrow_upward,
+                      isIn ? Icons.arrow_downward : Icons.account_balance_wallet,
                       size: 14,
-                      color: isIn ? AppColors.primaryDark : AppColors.danger,
+                      color: isIn ? AppColors.primaryDark : AppColors.warning,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -143,11 +186,11 @@ class M5CaisseView extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${isIn ? "+" : "–"} ${mov['amount']} FCFA',
+                    '${isIn ? "+" : ""} ${mov['amount']} FCFA',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: isIn ? AppColors.primaryDark : AppColors.danger,
+                      color: isIn ? AppColors.primaryDark : AppColors.warning,
                     ),
                   ),
                 ],
@@ -169,7 +212,7 @@ class M5CaisseView extends StatelessWidget {
           val,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 13.5,
+            fontSize: 12.5,
             fontWeight: FontWeight.bold,
           ),
         ),

@@ -149,7 +149,7 @@ class _T5GestionViewState extends State<T5GestionView> {
       for (final batch in batchList) {
         final buildingId = _findBuildingIdForBatch(
           batch.id,
-          batchesResponse is List ? batchesResponse as List<dynamic> : const [],
+          batchesResponse is List ? batchesResponse : const [],
         );
         if (buildingId != null) {
           batchesByBuilding
@@ -319,7 +319,7 @@ class _T5GestionViewState extends State<T5GestionView> {
                           context,
                           message: 'Ajout du bâtiment en cours...',
                         );
-                        final createdBuilding = await _apiClient.post(
+                        await _apiClient.post(
                           '/buildings',
                           data: {
                             'farm_id': currentFarmId,
@@ -564,6 +564,14 @@ class _T5GestionViewState extends State<T5GestionView> {
                       color: AppColors.primaryDark,
                     ),
                     tooltip: 'Modifier',
+                  ),
+                  IconButton(
+                    onPressed: () => _deleteBuilding(building),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: AppColors.danger,
+                    ),
+                    tooltip: 'Supprimer',
                   ),
                 ],
               ),

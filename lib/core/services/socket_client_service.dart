@@ -26,6 +26,14 @@ class SocketClientService extends ChangeNotifier {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _alertEventController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _saleEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _orderEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _anomalyEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _allEventsController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   SocketClientService({
     required CacheManager cacheManager,
@@ -49,6 +57,10 @@ class SocketClientService extends ChangeNotifier {
   Stream<Map<String, dynamic>> get activityEvents => _activityEventController.stream;
   Stream<Map<String, dynamic>> get stockEvents => _stockEventController.stream;
   Stream<Map<String, dynamic>> get alertEvents => _alertEventController.stream;
+  Stream<Map<String, dynamic>> get saleEvents => _saleEventController.stream;
+  Stream<Map<String, dynamic>> get orderEvents => _orderEventController.stream;
+  Stream<Map<String, dynamic>> get anomalyEvents => _anomalyEventController.stream;
+  Stream<Map<String, dynamic>> get allEvents => _allEventsController.stream;
 
   /// Établit la connexion Socket.IO avec le serveur
   void connect({required String token, String? farmId}) {
@@ -141,8 +153,13 @@ class SocketClientService extends ChangeNotifier {
       AppLogger.info('⚡ Événement reçu [task:created]: $data');
       _cacheManager.invalidatePrefix('/volailler/tasks');
       _cacheManager.invalidatePrefix('/activities');
+      _cacheManager.invalidatePrefix('/buildings');
+      _cacheManager.invalidatePrefix('/batches');
       if (data is Map) {
-        _taskEventController.add(Map<String, dynamic>.from(data));
+        final map = Map<String, dynamic>.from(data);
+        _taskEventController.add(map);
+        _allEventsController.add({'event': 'task:created', 'data': map});
+        notifyListeners();
       }
     });
 
@@ -151,8 +168,12 @@ class SocketClientService extends ChangeNotifier {
       AppLogger.info('⚡ Événement reçu [task:closed]: $data');
       _cacheManager.invalidatePrefix('/volailler/tasks');
       _cacheManager.invalidatePrefix('/activities');
+      _cacheManager.invalidatePrefix('/stocks');
       if (data is Map) {
-        _taskEventController.add(Map<String, dynamic>.from(data));
+        final map = Map<String, dynamic>.from(data);
+        _taskEventController.add(map);
+        _allEventsController.add({'event': 'task:closed', 'data': map});
+        notifyListeners();
       }
     });
 
@@ -161,8 +182,12 @@ class SocketClientService extends ChangeNotifier {
       AppLogger.info('⚡ Événement reçu [activity:updated]: $data');
       _cacheManager.invalidatePrefix('/activities');
       _cacheManager.invalidatePrefix('/volailler/tasks');
+      _cacheManager.invalidatePrefix('/stocks');
       if (data is Map) {
-        _activityEventController.add(Map<String, dynamic>.from(data));
+        final map = Map<String, dynamic>.from(data);
+        _activityEventController.add(map);
+        _allEventsController.add({'event': 'activity:updated', 'data': map});
+        notifyListeners();
       }
     });
 
@@ -170,8 +195,58 @@ class SocketClientService extends ChangeNotifier {
     _socket!.on('stock:updated', (data) {
       AppLogger.info('⚡ Événement reçu [stock:updated]: $data');
       _cacheManager.invalidatePrefix('/stocks');
+      _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+      _cacheManager.invalidatePrefix('/magasinier/caisse');
+      _cacheManager.invalidatePrefix('/magasinier/egg-exits');
       if (data is Map) {
-        _stockEventController.add(Map<String, dynamic>.from(data));
+        final map = Map<String, dynamic>.from(data);
+        _stockEventController.add(map);
+        _allEventsController.add({'event': 'stock:updated', 'data': map});
+        notifyListeners();
+      }
+    });
+
+    // Événement : Nouvelle vente enregistrée
+    _socket!.on('sale:created', (data) {
+      AppLogger.info('⚡ Événement reçu [sale:created]: $data');
+      _cacheManager.invalidatePrefix('/magasinier/sales');
+      _cacheManager.invalidatePrefix('/magasinier/caisse');
+      _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+      _cacheManager.invalidatePrefix('/magasinier/clients');
+      _cacheManager.invalidatePrefix('/stocks');
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        _saleEventController.add(map);
+        _allEventsController.add({'event': 'sale:created', 'data': map});
+        notifyListeners();
+      }
+    });
+
+    // Événement : Nouvelle commande fournisseur
+    _socket!.on('order:created', (data) {
+      AppLogger.info('⚡ Événement reçu [order:created]: $data');
+      _cacheManager.invalidatePrefix('/orders');
+      _cacheManager.invalidatePrefix('/activities');
+      _cacheManager.invalidatePrefix('/stocks');
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        _orderEventController.add(map);
+        _allEventsController.add({'event': 'order:created', 'data': map});
+        notifyListeners();
+      }
+    });
+
+    // Événement : Anomalie signalée
+    _socket!.on('anomaly:reported', (data) {
+      AppLogger.info('⚡ Événement reçu [anomaly:reported]: $data');
+      _cacheManager.invalidatePrefix('/anomalies');
+      _cacheManager.invalidatePrefix('/activities');
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        _anomalyEventController.add(map);
+        _alertEventController.add(map);
+        _allEventsController.add({'event': 'anomaly:reported', 'data': map});
+        notifyListeners();
       }
     });
 
@@ -179,7 +254,10 @@ class SocketClientService extends ChangeNotifier {
     _socket!.on('alert:new', (data) {
       AppLogger.info('⚡ Événement reçu [alert:new]: $data');
       if (data is Map) {
-        _alertEventController.add(Map<String, dynamic>.from(data));
+        final map = Map<String, dynamic>.from(data);
+        _alertEventController.add(map);
+        _allEventsController.add({'event': 'alert:new', 'data': map});
+        notifyListeners();
       }
     });
   }
@@ -207,6 +285,10 @@ class SocketClientService extends ChangeNotifier {
     _activityEventController.close();
     _stockEventController.close();
     _alertEventController.close();
+    _saleEventController.close();
+    _orderEventController.close();
+    _anomalyEventController.close();
+    _allEventsController.close();
     super.dispose();
   }
 }

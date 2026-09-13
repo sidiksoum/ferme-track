@@ -111,6 +111,55 @@ class ApiClient {
     }
   }
 
+  /// Invalide intelligemment les caches locaux liés à une mutation (POST / PUT / PATCH / DELETE)
+  Future<void> _invalidateRelatedCaches(String endpoint) async {
+    if (_cacheManager == null) return;
+    try {
+      final lower = endpoint.toLowerCase();
+      await _cacheManager.invalidatePrefix(endpoint);
+
+      if (lower.contains('task') || lower.contains('activit')) {
+        await _cacheManager.invalidatePrefix('/activities');
+        await _cacheManager.invalidatePrefix('/volailler/tasks');
+        await _cacheManager.invalidatePrefix('/buildings');
+        await _cacheManager.invalidatePrefix('/batches');
+      }
+      if (lower.contains('order') || lower.contains('reception')) {
+        await _cacheManager.invalidatePrefix('/orders');
+        await _cacheManager.invalidatePrefix('/stocks');
+        await _cacheManager.invalidatePrefix('/magasinier/egg-exits');
+        await _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+        await _cacheManager.invalidatePrefix('/magasinier/receptions');
+      }
+      if (lower.contains('egg') || lower.contains('oeuf') || lower.contains('receptions') || lower.contains('exit')) {
+        await _cacheManager.invalidatePrefix('/magasinier/egg-exits');
+        await _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+        await _cacheManager.invalidatePrefix('/magasinier/receptions');
+        await _cacheManager.invalidatePrefix('/stocks');
+      }
+      if (lower.contains('stock')) {
+        await _cacheManager.invalidatePrefix('/stocks');
+        await _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+      }
+      if (lower.contains('sale') || lower.contains('client') || lower.contains('caisse') || lower.contains('refund') || lower.contains('payment') || lower.contains('debtor')) {
+        await _cacheManager.invalidatePrefix('/commercial/sales');
+        await _cacheManager.invalidatePrefix('/magasinier/sales');
+        await _cacheManager.invalidatePrefix('/magasinier/clients');
+        await _cacheManager.invalidatePrefix('/magasinier/caisse');
+        await _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+        await _cacheManager.invalidatePrefix('/stocks');
+      }
+      if (lower.contains('building') || lower.contains('batch')) {
+        await _cacheManager.invalidatePrefix('/buildings');
+        await _cacheManager.invalidatePrefix('/batches');
+      }
+      if (lower.contains('anomal')) {
+        await _cacheManager.invalidatePrefix('/anomalies');
+        await _cacheManager.invalidatePrefix('/activities');
+      }
+    } catch (_) {}
+  }
+
   /// POST request
   Future<dynamic> post(
     String endpoint, {
@@ -126,7 +175,9 @@ class ApiClient {
         queryParameters: queryParameters,
         options: options,
       );
-      return _handleResponse(response);
+      final result = _handleResponse(response);
+      unawaited(_invalidateRelatedCaches(endpoint));
+      return result;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -147,7 +198,9 @@ class ApiClient {
         queryParameters: queryParameters,
         options: options,
       );
-      return _handleResponse(response);
+      final result = _handleResponse(response);
+      unawaited(_invalidateRelatedCaches(endpoint));
+      return result;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -168,7 +221,9 @@ class ApiClient {
         queryParameters: queryParameters,
         options: options,
       );
-      return _handleResponse(response);
+      final result = _handleResponse(response);
+      unawaited(_invalidateRelatedCaches(endpoint));
+      return result;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -189,7 +244,9 @@ class ApiClient {
         queryParameters: queryParameters,
         options: options,
       );
-      return _handleResponse(response);
+      final result = _handleResponse(response);
+      unawaited(_invalidateRelatedCaches(endpoint));
+      return result;
     } on DioException catch (e) {
       throw _handleError(e);
     }

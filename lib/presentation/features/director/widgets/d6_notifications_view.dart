@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class D6NotificationsView extends StatelessWidget {
@@ -7,94 +9,94 @@ class D6NotificationsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        const Text(
-          'ALERTES EN ATTENTE (3 NON LUES)',
-          style: AppTypography.labelSmall,
-        ),
-        const SizedBox(height: 9),
-        _buildNotificationRow(
-          context,
-          title: 'Mortalité anormale — Bât. C',
-          desc: 'Taux 1,8 % sur 24h, seuil dépassé',
-          type: AlertType.error,
-          unread: true,
-          details:
-              'Le taux de mortalité sur les dernières 24h est de 1.8%, ce qui dépasse le seuil critique pour le Bâtiment C.\n\nRecommandation : inspecter le lot L-2026-013, isoler les sujets fébriles et désinfecter les abreuvoirs.',
-        ),
-        _buildNotificationRow(
-          context,
-          title: 'Rupture de stock',
-          desc: 'Aliment démarrage sous le seuil',
-          type: AlertType.error,
-          unread: true,
-          details:
-              'Le stock d\'aliment démarrage est descendu sous le seuil critique de 5 sacs.\nQuantité actuelle : 3 sacs.\n\nAction : Une commande d\'approvisionnement urgente doit être planifiée.',
-        ),
-        _buildNotificationRow(
-          context,
-          title: 'Échéance de paiement',
-          desc: 'Seydou Yao — 65 000 FCFA, en retard',
-          type: AlertType.warning,
-          unread: true,
-          details:
-              'Le client Seydou Yao (Grossiste) présente un retard de paiement de 65 000 FCFA pour sa commande du 12/08.\n\nAction : Relancer le client par téléphone ou suspendre les ventes à crédit.',
-        ),
-        _buildNotificationRow(
-          context,
-          title: 'Retard de livraison',
-          desc: 'Commande AB-118 — fournisseur Avicola',
-          type: AlertType.info,
-          unread: false,
-          details:
-              'La livraison de la commande AB-118 (aliment ponte) par Avicola SARL prévue hier n\'a pas encore été validée en magasin.\n\nAction : Contacter le transporteur d\'Avicola.',
-        ),
-        _buildNotificationRow(
-          context,
-          title: 'Anomalie signalée — Yao B.',
-          desc: 'Fuite d\'abreuvoir, Bâtiment B',
-          type: AlertType.error,
-          unread: false,
-          details:
-              'Le volailler Yao B. a rapporté une fuite d\'eau continue au niveau de l\'abreuvoir n°3 dans le Bâtiment B.\n\nAction : Dépêcher le technicien de maintenance.',
-        ),
-      ],
-    );
-  }
+    return Consumer<SystemNotificationService>(
+      builder: (context, notifService, _) {
+        final notifications = notifService.notifications;
+        final unreadCount = notifService.unreadCount;
 
-  Widget _buildNotificationRow(
-    BuildContext context, {
-    required String title,
-    required String desc,
-    required AlertType type,
-    required bool unread,
-    required String details,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: AlertRow(
-            title: title,
-            subtitle: desc,
-            type: type,
-            onTap: () => _showNotificationDetail(context, title, details),
-          ),
-        ),
-        if (unread) ...[
-          const SizedBox(width: 8),
-          Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
+        return ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'NOTIFICATIONS & ALERTES ($unreadCount NON LUE${unreadCount > 1 ? 'S' : ''})',
+                  style: AppTypography.labelSmall,
+                ),
+                if (unreadCount > 0)
+                  GestureDetector(
+                    onTap: () => notifService.markAllAsRead(),
+                    child: const Text(
+                      'Tout marquer comme lu',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ],
+            const SizedBox(height: 12),
+            if (notifications.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Text(
+                    'Aucune alerte ou notification active.',
+                    style: TextStyle(color: AppColors.inkSoft),
+                  ),
+                ),
+              )
+            else
+              ...notifications.map((notif) {
+                AlertType alertType = AlertType.info;
+                if (notif.type.contains('alert') || notif.type == 'anomaly') {
+                  alertType = AlertType.error;
+                } else if (notif.type == 'credit' || notif.type == 'late') {
+                  alertType = AlertType.warning;
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: AlertRow(
+                          title: notif.title,
+                          subtitle: notif.message,
+                          type: alertType,
+                          onTap: () {
+                            notifService.markAsRead(notif.id);
+                            _showNotificationDetail(
+                              context,
+                              notif.title,
+                              notif.message,
+                              _formatTime(notif.timestamp),
+                            );
+                          },
+                        ),
+                      ),
+                      if (!notif.isRead) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+          ],
+        );
+      },
     );
   }
 
@@ -102,6 +104,7 @@ class D6NotificationsView extends StatelessWidget {
     BuildContext context,
     String title,
     String details,
+    String time,
   ) {
     showDialog(
       context: context,
@@ -128,6 +131,11 @@ class D6NotificationsView extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Reçu à $time',
+                style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
+              ),
               const SizedBox(height: 12),
               Text(details, style: const TextStyle(fontSize: 13, height: 1.4)),
             ],
@@ -141,5 +149,9 @@ class D6NotificationsView extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _formatTime(DateTime dt) {
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }

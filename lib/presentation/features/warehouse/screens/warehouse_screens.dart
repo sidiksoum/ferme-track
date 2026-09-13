@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/m1_accueil_sales_view.dart';
@@ -41,13 +42,52 @@ class _SalesScreenState extends State<SalesScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            tooltip: 'Notifications',
-            onPressed: () {
-              setState(() {
-                _isShowingNotifications = !_isShowingNotifications;
-              });
+          Consumer<SystemNotificationService>(
+            builder: (context, notifService, _) {
+              final unread = notifService.unreadCount;
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _isShowingNotifications = !_isShowingNotifications;
+                }),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(
+                        Icons.notifications_none,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                      if (!_isShowingNotifications && unread > 0)
+                        Positioned(
+                          top: 10,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 12,
+                              minHeight: 12,
+                            ),
+                            child: Text(
+                              unread > 99 ? '99+' : '$unread',
+                              style: const TextStyle(
+                                color: AppColors.primaryDark,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
             },
           ),
           IconButton(
@@ -152,19 +192,15 @@ class _SalesScreenState extends State<SalesScreen> {
     if (_isShowingNotifications) {
       return const M6NotificationsView();
     }
-    switch (_selectedNavIndex) {
-      case 0:
-        return M1AccueilSalesView(userName: userName);
-      case 1:
-        return const M2SaleCaisseView();
-      case 2:
-        return const M5CaisseView();
-      case 3:
-        return const M3EggReceptionView();
-      case 4:
-        return const M4ClientsListView();
-      default:
-        return M1AccueilSalesView(userName: userName);
-    }
+    return IndexedStack(
+      index: _selectedNavIndex,
+      children: [
+        M1AccueilSalesView(userName: userName),
+        const M2SaleCaisseView(),
+        const M5CaisseView(),
+        const M3EggReceptionView(),
+        const M4ClientsListView(),
+      ],
+    );
   }
 }

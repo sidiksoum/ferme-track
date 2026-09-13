@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
-import '../../../shared/widgets/common_widgets.dart';
 
 class T4StatsView extends StatefulWidget {
   const T4StatsView({super.key});
