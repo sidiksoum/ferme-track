@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/socket_client_service.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 
 class T4StatsView extends StatefulWidget {
   const T4StatsView({super.key});
@@ -9,203 +13,290 @@ class T4StatsView extends StatefulWidget {
 }
 
 class _T4StatsViewState extends State<T4StatsView> {
+  final ApiClient _apiClient = getIt<ApiClient>();
+  final SocketClientService _socketService = getIt<SocketClientService>();
+  StreamSubscription? _socketSubscription;
+
   String _periodFilter = '7j'; // today, 7j, 30j, custom
-  String _buildingFilter = 'Tous'; // Tous, A, B, C, D
+  String _buildingFilter = 'Tous'; // Tous, or building id/name
   DateTimeRange? _selectedDateRange;
 
-  // Mock data for buildings stats
-  final List<Map<String, dynamic>> _allBuildingsData = [
-    {
-      'id': 'A',
-      'name': 'Bâtiment A',
-      'volailler': 'Ama Koffi',
-      'activitiesPercent': '92%',
-      'yield': '98%',
-      'mortalityToday': 0,
-      'mortality7j': 3,
-      'mortality30j': 12,
-    },
-    {
-      'id': 'B',
-      'name': 'Bâtiment B',
-      'volailler': 'Yao B.',
-      'activitiesPercent': '85%',
-      'yield': '95%',
-      'mortalityToday': 1,
-      'mortality7j': 14,
-      'mortality30j': 42,
-    },
-    {
-      'id': 'C',
-      'name': 'Bâtiment C',
-      'volailler': 'Dr. Koffi',
-      'activitiesPercent': '78%',
-      'yield': '87%',
-      'mortalityToday': 4,
-      'mortality7j': 20,
-      'mortality30j': 68,
-      'isRed': true,
-    },
-    {
-      'id': 'D',
-      'name': 'Bâtiment D',
-      'volailler': 'Seydou Yao',
-      'activitiesPercent': '64%',
-      'yield': '76%',
-      'mortalityToday': 8,
-      'mortality7j': 35,
-      'mortality30j': 110,
-      'isRed': true,
-    },
-  ];
+  // Real data for buildings stats
+  List<Map<String, dynamic>> _allBuildingsData = [];
+  List<Map<String, dynamic>> _layingChartData = [];
+  Map<String, dynamic> _statsSummary = {
+    'totalEggs': 0,
+    'totalDeaths': 0,
+    'totalBirds': 0,
+    'overallLayingRate': '0%',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatsData();
+
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final evt = event['event']?.toString() ?? '';
+      if (evt.contains('egg') ||
+          evt.contains('mortality') ||
+          evt.contains('task') ||
+          evt.contains('activity') ||
+          evt.contains('reception')) {
+        if (mounted) {
+          _loadStatsData(forceRefresh: true);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadStatsData({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    try {
+      final queryParams = <String, dynamic>{
+        'period': _periodFilter,
+        'buildingId': _buildingFilter,
+      };
+      if (_periodFilter == 'custom' && _selectedDateRange != null) {
+        queryParams['start_date'] = _selectedDateRange!.start.toIso8601String();
+        queryParams['end_date'] = _selectedDateRange!.end.toIso8601String();
+      }
+
+      final response = await _apiClient.get(
+        '/technician/stats/production',
+        queryParameters: queryParams,
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+
+      if (!mounted || response is! Map) return;
+
+      final buildings = response['buildings'] as List? ?? [];
+      final chart = response['layingChart'] as List? ?? [];
+      final summary = response['summary'] as Map? ?? {};
+
+      setState(() {
+        _allBuildingsData = buildings
+            .whereType<Map>()
+            .map((b) => Map<String, dynamic>.from(b))
+            .toList();
+        _layingChartData = chart
+            .whereType<Map>()
+            .map((c) => Map<String, dynamic>.from(c))
+            .toList();
+        if (summary.isNotEmpty) {
+          _statsSummary = Map<String, dynamic>.from(summary);
+        }
+      });
+    } catch (_) {}
+  }
 
   int _getMortalityForPeriod(Map<String, dynamic> item) {
-    if (_periodFilter == 'today') {
-      return item['mortalityToday'] as int;
-    } else if (_periodFilter == '30j') {
-      return item['mortality30j'] as int;
-    } else {
-      // 7j or custom
-      return item['mortality7j'] as int;
-    }
+    return (item['mortalityCount'] as num?)?.toInt() ?? 0;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Filter by building
     final filteredBuildings = _allBuildingsData.where((b) {
       if (_buildingFilter == 'Tous') return true;
-      return b['id'] == _buildingFilter;
+      final id = b['id']?.toString() ?? '';
+      final name = b['name']?.toString() ?? '';
+      return id == _buildingFilter || name.contains(_buildingFilter);
     }).toList();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Period Filter
-          const Text('FILTRER PAR PÉRIODE', style: AppTypography.labelSmall),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildPeriodChip(
-                'Aujourd\'hui',
-                _periodFilter == 'today',
-                () => setState(() => _periodFilter = 'today'),
-              ),
-              _buildPeriodChip(
-                '7 jours',
-                _periodFilter == '7j',
-                () => setState(() => _periodFilter = '7j'),
-              ),
-              _buildPeriodChip(
-                'Mois en cours',
-                _periodFilter == '30j',
-                () => setState(() => _periodFilter = '30j'),
-              ),
-              _buildPeriodChip(
-                'Personnalisé',
-                _periodFilter == 'custom',
-                () async {
-                  setState(() => _periodFilter = 'custom');
-                  final picked = await showDateRangePicker(
-                    context: context,
-                    firstDate: DateTime(2025),
-                    lastDate: DateTime(2027),
-                  );
-                  if (picked != null) {
-                    setState(() => _selectedDateRange = picked);
-                  }
-                },
+    return RefreshIndicator(
+      onRefresh: () => _loadStatsData(forceRefresh: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Period Filter
+            const Text('FILTRER PAR PÉRIODE', style: AppTypography.labelSmall),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildPeriodChip(
+                  'Aujourd\'hui',
+                  _periodFilter == 'today',
+                  () {
+                    setState(() => _periodFilter = 'today');
+                    _loadStatsData();
+                  },
+                ),
+                _buildPeriodChip(
+                  '7 jours',
+                  _periodFilter == '7j',
+                  () {
+                    setState(() => _periodFilter = '7j');
+                    _loadStatsData();
+                  },
+                ),
+                _buildPeriodChip(
+                  'Mois en cours',
+                  _periodFilter == '30j',
+                  () {
+                    setState(() => _periodFilter = '30j');
+                    _loadStatsData();
+                  },
+                ),
+                _buildPeriodChip(
+                  'Personnalisé',
+                  _periodFilter == 'custom',
+                  () async {
+                    final picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2025),
+                      lastDate: DateTime(2027),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _periodFilter = 'custom';
+                        _selectedDateRange = picked;
+                      });
+                      _loadStatsData();
+                    }
+                  },
+                ),
+              ],
+            ),
+            if (_periodFilter == 'custom' && _selectedDateRange != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Période : ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
-          ),
-          if (_periodFilter == 'custom' && _selectedDateRange != null) ...[
+            const SizedBox(height: 16),
+
+            // 2. Building Filter
+            const Text('FILTRER PAR BÂTIMENT', style: AppTypography.labelSmall),
             const SizedBox(height: 6),
-            Text(
-              'Période : ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildBuildingChip('Tous', _buildingFilter == 'Tous'),
+                  ..._allBuildingsData.map((b) {
+                    final name = b['name']?.toString() ?? 'Bâtiment';
+                    final id = b['id']?.toString() ?? name;
+                    return _buildBuildingChip(
+                      name,
+                      _buildingFilter == id || _buildingFilter == name,
+                    );
+                  }),
+                ],
               ),
             ),
+            const SizedBox(height: 20),
+
+            _buildComparativeTable(filteredBuildings),
+            const SizedBox(height: 24),
+
+            // 3. Comparative Building list
+            const Text('RAPPORTS COMPARATIFS', style: AppTypography.labelSmall),
+            const SizedBox(height: 10),
+
+            if (filteredBuildings.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.paper,
+                  border: Border.all(color: AppColors.line),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Aucun bâtiment enregistré pour cette période',
+                    style: TextStyle(
+                      color: AppColors.inkSoft,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              )
+            else
+              ...filteredBuildings.map((b) {
+                final int mortality = _getMortalityForPeriod(b);
+                return _buildBuildingStat(
+                  letter: b['id'] as String? ?? 'A',
+                  name: b['name'] as String? ?? 'Bâtiment',
+                  volailler: b['volailler'] as String? ?? 'Volailler',
+                  activitiesPercent: b['activitiesPercent'] as String? ?? '90%',
+                  mortalityCount: mortality,
+                  yieldVal: b['yield'] as String? ?? '95%',
+                  isRed: b['isRed'] == true,
+                );
+              }),
+            const SizedBox(height: 20),
+
+            // 4. Bar chart
+            const Text(
+              'PRODUCTION D\'ŒUFS — HISTORIQUE',
+              style: AppTypography.labelSmall,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Nombre d\'œufs (Plateaux de 30)',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.inkSoft,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 180,
+              child: _buildDynamicBarChart(),
+            ),
+            const SizedBox(height: 20),
           ],
-          const SizedBox(height: 16),
-
-          // 2. Building Filter
-          const Text('FILTRER PAR BÂTIMENT', style: AppTypography.labelSmall),
-          const SizedBox(height: 6),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildBuildingChip('Tous', _buildingFilter == 'Tous'),
-                _buildBuildingChip('Bât. A', _buildingFilter == 'A'),
-                _buildBuildingChip('Bât. B', _buildingFilter == 'B'),
-                _buildBuildingChip('Bât. C', _buildingFilter == 'C'),
-                _buildBuildingChip('Bât. D', _buildingFilter == 'D'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          _buildComparativeTable(),
-          const SizedBox(height: 24),
-
-          // 3. Comparative Building list
-          const Text('RAPPORTS COMPARATIFS', style: AppTypography.labelSmall),
-          const SizedBox(height: 10),
-
-          ...filteredBuildings.map((b) {
-            final int mortality = _getMortalityForPeriod(b);
-            return _buildBuildingStat(
-              letter: b['id'] as String,
-              name: b['name'] as String,
-              volailler: b['volailler'] as String,
-              activitiesPercent: b['activitiesPercent'] as String,
-              mortalityCount: mortality,
-              yieldVal: b['yield'] as String,
-              isRed: b['isRed'] == true,
-            );
-          }),
-          const SizedBox(height: 20),
-
-          // 4. Bar chart
-          const Text(
-            'PRODUCTION D\'ŒUFS — HISTORIQUE',
-            style: AppTypography.labelSmall,
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Nombre d\'œufs (Plateaux de 30)',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.inkSoft,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 180,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildBar(0.40, 'L', false),
-                _buildBar(0.58, 'M', false),
-                _buildBar(0.35, 'M', false, isLight: true),
-                _buildBar(0.64, 'J', false),
-                _buildBar(0.70, 'V', false),
-                _buildBar(0.85, 'S', true),
-                _buildBar(0.60, 'D', false),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDynamicBarChart() {
+    if (_layingChartData.isEmpty) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _buildBar(0.15, 'L', false, 0, 0),
+          _buildBar(0.15, 'M', false, 0, 0),
+          _buildBar(0.15, 'M', false, 0, 0, isLight: true),
+          _buildBar(0.15, 'J', false, 0, 0),
+          _buildBar(0.15, 'V', false, 0, 0),
+          _buildBar(0.15, 'S', false, 0, 0),
+          _buildBar(0.15, 'D', false, 0, 0),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: _layingChartData.map((item) {
+        final double height = (item['relativeHeight'] as num?)?.toDouble() ?? 0.15;
+        final String day = item['day']?.toString() ?? 'J';
+        final bool isToday = item['isToday'] == true;
+        final int eggs = (item['eggsCount'] as num?)?.toInt() ?? 0;
+        final int plates = (item['platesCount'] as num?)?.toInt() ?? (eggs / 30).round();
+
+        return _buildBar(height, day, isToday, eggs, plates);
+      }).toList(),
     );
   }
 
@@ -314,7 +405,7 @@ class _T4StatsViewState extends State<T4StatsView> {
     );
   }
 
-  Widget _buildComparativeTable() {
+  Widget _buildComparativeTable(List<Map<String, dynamic>> buildings) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -344,38 +435,22 @@ class _T4StatsViewState extends State<T4StatsView> {
               ),
               children: [
                 _buildTableHeaderRow(),
-                _buildTableDataRow(
-                  'Bât. A',
-                  '3 200',
-                  '94%',
-                  '3 morts',
-                  'Excellent',
-                  AppColors.primaryDark,
-                ),
-                _buildTableDataRow(
-                  'Bât. B',
-                  '3 000',
-                  '91%',
-                  '14 morts',
-                  'Stable',
-                  AppColors.primary,
-                ),
-                _buildTableDataRow(
-                  'Bât. C',
-                  '3 100',
-                  '85%',
-                  '20 morts',
-                  'Vigilance',
-                  AppColors.accent,
-                ),
-                _buildTableDataRow(
-                  'Bât. D',
-                  '3 100',
-                  '72%',
-                  '35 morts',
-                  'Critique',
-                  AppColors.danger,
-                ),
+                ...buildings.map((b) {
+                  final state = b['status'] as String? ?? 'Stable';
+                  Color stateColor = AppColors.primary;
+                  if (state == 'Excellent') stateColor = AppColors.primaryDark;
+                  if (state == 'Vigilance') stateColor = AppColors.accent;
+                  if (state == 'Critique') stateColor = AppColors.danger;
+
+                  return _buildTableDataRow(
+                    b['name'] as String? ?? 'Bâtiment',
+                    b['birdsCount'] as String? ?? '3 000',
+                    b['yield'] as String? ?? '90%',
+                    b['mortality'] as String? ?? '0 mort',
+                    state,
+                    stateColor,
+                  );
+                }),
               ],
             ),
           ),
@@ -455,7 +530,7 @@ class _T4StatsViewState extends State<T4StatsView> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -492,16 +567,31 @@ class _T4StatsViewState extends State<T4StatsView> {
       : _periodFilter == '30j'
       ? 'Mois en cours'
       : '7 derniers jours';
-  String _eggsForPeriod() => _periodFilter == 'today'
-      ? '9 850'
-      : _periodFilter == '30j'
-      ? '285 400'
-      : '68 950';
-  String _mortalityForPeriod() => _periodFilter == 'today'
-      ? '8 sujets'
-      : _periodFilter == '30j'
-      ? '218 sujets'
-      : '72 sujets';
+
+  String _eggsForPeriod() {
+    final eggs = (_statsSummary['totalEggs'] as num?)?.toInt() ?? 0;
+    return _formatNumber(eggs);
+  }
+
+  String _mortalityForPeriod() {
+    final deaths = (_statsSummary['totalDeaths'] as num?)?.toInt() ?? 0;
+    return '$deaths ${deaths > 1 ? "sujets" : "sujet"}';
+  }
+
+  String _formatNumber(int val) {
+    final str = val.toString();
+    if (str.length <= 3) return str;
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        buffer.write(' ');
+      }
+    }
+    return buffer.toString().split('').reversed.join('');
+  }
 
   Widget _buildSummaryCard(
     String title,
@@ -581,7 +671,10 @@ class _T4StatsViewState extends State<T4StatsView> {
         ? 'Tous'
         : label.replaceAll('Bât. ', '');
     return GestureDetector(
-      onTap: () => setState(() => _buildingFilter = targetFilter),
+      onTap: () {
+        setState(() => _buildingFilter = targetFilter);
+        _loadStatsData();
+      },
       child: Container(
         margin: const EdgeInsets.only(right: 6),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -607,15 +700,14 @@ class _T4StatsViewState extends State<T4StatsView> {
   Widget _buildBar(
     double heightFactor,
     String label,
-    bool highlight, {
+    bool highlight,
+    int eggCount,
+    int plateCount, {
     bool isLight = false,
   }) {
     Color barColor = AppColors.primary;
     if (highlight) barColor = AppColors.accent;
     if (isLight) barColor = AppColors.primaryLight;
-
-    final int eggCount = (heightFactor * 3000).toInt();
-    final int plateCount = (eggCount / 30).round();
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -631,7 +723,7 @@ class _T4StatsViewState extends State<T4StatsView> {
         ),
         const SizedBox(height: 6),
         Container(
-          height: 120 * heightFactor,
+          height: 120 * heightFactor.clamp(0.2, 1.0),
           width: 18,
           decoration: BoxDecoration(
             color: barColor,
@@ -656,3 +748,4 @@ class _T4StatsViewState extends State<T4StatsView> {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 }
+

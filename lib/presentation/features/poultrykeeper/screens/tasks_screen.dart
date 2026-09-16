@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import '../../../../config/theme/app_theme.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/interfaces/network_checker.dart';
 import '../../../../core/services/offline_sync_service.dart';
+import '../../../../core/services/socket_client_service.dart';
 import '../../../../data/datasources/remote/api_client.dart';
 import '../../../../core/services/system_notification_service.dart';
 import '../../../shared/widgets/common_widgets.dart';
@@ -25,22 +27,61 @@ class PoltrykeeperTasksScreen extends StatefulWidget {
 }
 
 class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
+  final ApiClient _apiClient = getIt<ApiClient>();
+  final SocketClientService _socketService = getIt<SocketClientService>();
+  StreamSubscription? _socketSubscription;
+
   int _selectedNavIndex = 0;
   bool _isShowingNotifications = false;
+  bool _isLoadingAnomalies = false;
 
-  // Mock list of reported anomalies for the 3rd tab
-  final List<Map<String, dynamic>> _reportedAnomalies = [
-    {
-      'title': 'Mortalité signalée',
-      'meta': 'Bâtiment C · 3 sujets · Cause: Chaleur',
-      'date': 'Aujourd\'hui · 14:15',
-    },
-    {
-      'title': 'Fuite d\'eau',
-      'meta': 'Bâtiment B · Abreuvoir n°3',
-      'date': 'Hier · 09:30',
-    },
-  ];
+  // Real list of reported anomalies from backend
+  List<Map<String, dynamic>> _reportedAnomalies = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAnomaliesHistory();
+
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final evt = event['event']?.toString() ?? '';
+      if (evt.contains('anomal') || evt.contains('mortality') || evt.contains('task')) {
+        if (mounted) {
+          _loadAnomaliesHistory(forceRefresh: true);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAnomaliesHistory({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    if (_reportedAnomalies.isEmpty) {
+      setState(() => _isLoadingAnomalies = true);
+    }
+    try {
+      final response = await _apiClient.get(
+        '/volailler/anomalies/my-history',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (!mounted || response is! List) return;
+      setState(() {
+        _reportedAnomalies = response
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      });
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isLoadingAnomalies = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,102 +260,126 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
   }
 
   Widget _buildAnomaliesHistory() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(14),
-      itemCount: _reportedAnomalies.length,
-      itemBuilder: (context, index) {
-        final item = _reportedAnomalies[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            color: AppColors.paper,
-            border: Border.all(color: AppColors.line),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: InkWell(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (dialogContext) {
-                  return AlertDialog(
-                    title: Text(item['title'] as String),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Type : ${item['title']}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('Date : ${item['date']}'),
-                        const SizedBox(height: 8),
-                        Text('Détails : ${item['meta']}'),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: const Text('Fermer'),
+    return RefreshIndicator(
+      onRefresh: () => _loadAnomaliesHistory(forceRefresh: true),
+      child: _isLoadingAnomalies && _reportedAnomalies.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _reportedAnomalies.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(32),
+                  children: const [
+                    Center(
+                      child: Text(
+                        'Aucune anomalie déclarée pour le moment.',
+                        style: TextStyle(color: AppColors.inkSoft),
                       ),
-                    ],
-                  );
-                },
-              );
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(
-                      color: AppColors.errorLight,
-                      shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.warning,
-                      color: AppColors.danger,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item['title'] as String,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.5,
+                  ],
+                )
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(14),
+                  itemCount: _reportedAnomalies.length,
+                  itemBuilder: (context, index) {
+                    final item = _reportedAnomalies[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.paper,
+                        border: Border.all(color: AppColors.line),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (dialogContext) {
+                              return AlertDialog(
+                                title: Text(item['title'] as String? ?? 'Anomalie'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Type : ${item['title']}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text('Date : ${item['date'] ?? ''}'),
+                                    const SizedBox(height: 8),
+                                    Text('Détails : ${item['meta'] ?? ''}'),
+                                    if (item['comment'] != null &&
+                                        item['comment'].toString().trim().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text('Notes : ${item['comment']}'),
+                                    ],
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dialogContext),
+                                    child: const Text('Fermer'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.errorLight,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.warning,
+                                  color: AppColors.danger,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['title'] as String? ?? 'Anomalie',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      item['meta'] as String? ?? '',
+                                      style: const TextStyle(
+                                        color: AppColors.inkSoft,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                item['date'] as String? ?? '',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.inkSoft,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          item['meta'] as String,
-                          style: const TextStyle(
-                            color: AppColors.inkSoft,
-                            fontSize: 11.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    item['date'] as String,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.inkSoft,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+                      ),
+                    );
+                  },
+                ),
     );
   }
 
@@ -374,7 +439,11 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
         if (decoded is Map) {
           final lines = <String>[];
           if (decoded['feedQtyKg'] != null)
-            lines.add('Quantité distribuée : ${decoded['feedQtyKg']} kg');
+            lines.add('Quantité d\'aliment distribué : ${decoded['feedQtyKg']} kg');
+          if (decoded['dose'] != null)
+            lines.add('Quantité dose utilisée : ${decoded['dose']}');
+          if (decoded['weight'] != null)
+            lines.add('Poids moyen constaté : ${decoded['weight']} kg');
           if (decoded['eggsProduced'] != null)
             lines.add('Œufs produits : ${decoded['eggsProduced']}');
           if (decoded['eggsBroken'] != null)

@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
-import '../../../shared/widgets/common_widgets.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/socket_client_service.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 
 class D7StatsTableView extends StatefulWidget {
   const D7StatsTableView({super.key});
@@ -10,184 +13,357 @@ class D7StatsTableView extends StatefulWidget {
 }
 
 class _D7StatsTableViewState extends State<D7StatsTableView> {
+  final ApiClient _apiClient = getIt<ApiClient>();
+  final SocketClientService _socketService = getIt<SocketClientService>();
+  StreamSubscription? _socketSubscription;
+
   String _periodFilter = '7j'; // today, 7j, 30j, custom
   DateTimeRange? _selectedDateRange;
 
-  // Mock stats changing based on period
-  String _getLayingRate(String baseRate) {
-    if (_periodFilter == 'today') {
-      return baseRate;
-    } else if (_periodFilter == '30j') {
-      final val = int.tryParse(baseRate.replaceAll('%', ''));
-      return val != null ? '${(val - 3).clamp(10, 100)}%' : baseRate;
-    } else {
-      final val = int.tryParse(baseRate.replaceAll('%', ''));
-      return val != null ? '${(val - 1).clamp(10, 100)}%' : baseRate;
-    }
+  List<Map<String, dynamic>> _buildingsData = [];
+  List<Map<String, dynamic>> _layingChartData = [];
+  Map<String, dynamic> _statsSummary = {
+    'totalEggs': 0,
+    'totalDeaths': 0,
+    'totalBirds': 0,
+    'overallLayingRate': '0%',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatsData();
+
+    _socketSubscription = _socketService.allEvents.listen((event) {
+      final evt = event['event']?.toString() ?? '';
+      if (evt.contains('egg') ||
+          evt.contains('mortality') ||
+          evt.contains('task') ||
+          evt.contains('activity') ||
+          evt.contains('stock') ||
+          evt.contains('reception')) {
+        if (mounted) {
+          _loadStatsData(forceRefresh: true);
+        }
+      }
+    });
   }
 
-  String _getMortality(String baseMortality) {
-    final count = int.tryParse(baseMortality.replaceAll(' morts', ''));
-    if (count == null) return baseMortality;
-    if (_periodFilter == 'today') {
-      return '${(count / 10).round()} mort(s)';
-    } else if (_periodFilter == '30j') {
-      return '${(count * 3)} morts';
-    } else {
-      return '$count morts';
-    }
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    super.dispose();
   }
 
-  String _getEggsCollected() {
-    if (_periodFilter == 'today') {
-      return '9 850';
-    } else if (_periodFilter == '30j') {
-      return '285 400';
-    } else {
-      return '68 950';
-    }
+  Future<void> _loadStatsData({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    try {
+      final queryParams = <String, dynamic>{
+        'period': _periodFilter,
+      };
+      if (_periodFilter == 'custom' && _selectedDateRange != null) {
+        queryParams['start_date'] = _selectedDateRange!.start.toIso8601String();
+        queryParams['end_date'] = _selectedDateRange!.end.toIso8601String();
+      }
+
+      final response = await _apiClient.get(
+        '/director/stats/comparative',
+        queryParameters: queryParams,
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+
+      if (!mounted || response is! Map) return;
+
+      final buildings = response['buildings'] as List? ?? [];
+      final chart = response['layingChart'] as List? ?? [];
+      final summary = response['summary'] as Map? ?? {};
+
+      setState(() {
+        _buildingsData = buildings
+            .whereType<Map>()
+            .map((b) => Map<String, dynamic>.from(b))
+            .toList();
+        _layingChartData = chart
+            .whereType<Map>()
+            .map((c) => Map<String, dynamic>.from(c))
+            .toList();
+        if (summary.isNotEmpty) {
+          _statsSummary = Map<String, dynamic>.from(summary);
+        }
+      });
+    } catch (_) {}
   }
 
-  String _getMortalityTotalText() {
-    if (_periodFilter == 'today') {
-      return '8 sujets';
-    } else if (_periodFilter == '30j') {
-      return '218 sujets';
-    } else {
-      return '72 sujets';
+  Color _getStatusColor(String status, String? hexColor) {
+    if (hexColor != null && hexColor.isNotEmpty) {
+      if (hexColor.startsWith('#')) {
+        final hex = hexColor.replaceAll('#', '');
+        if (hex.length == 6) {
+          return Color(int.parse('0xFF$hex'));
+        }
+      }
+    }
+    switch (status) {
+      case 'Excellent':
+        return AppColors.primaryDark;
+      case 'Stable':
+        return AppColors.primary;
+      case 'Vigilance':
+        return AppColors.accent;
+      case 'Critique':
+        return AppColors.danger;
+      default:
+        return AppColors.primary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Period Filter
-          const Text('FILTRER PAR PÉRIODE', style: AppTypography.labelSmall),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildPeriodChip('Aujourd\'hui', _periodFilter == 'today', () => setState(() => _periodFilter = 'today')),
-              _buildPeriodChip('7 jours', _periodFilter == '7j', () => setState(() => _periodFilter = '7j')),
-              _buildPeriodChip('Mois en cours', _periodFilter == '30j', () => setState(() => _periodFilter = '30j')),
-              _buildPeriodChip('Personnalisé', _periodFilter == 'custom', () async {
-                setState(() => _periodFilter = 'custom');
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2025),
-                  lastDate: DateTime(2027),
-                );
-                if (picked != null) {
-                  setState(() => _selectedDateRange = picked);
-                }
-              }),
-            ],
-          ),
-          if (_periodFilter == 'custom' && _selectedDateRange != null) ...[
+    return RefreshIndicator(
+      onRefresh: () => _loadStatsData(forceRefresh: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Period Filter
+            const Text('FILTRER PAR PÉRIODE', style: AppTypography.labelSmall),
             const SizedBox(height: 6),
-            Text(
-              'Période : ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}',
-              style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
-            ),
-          ],
-          const SizedBox(height: 16),
-
-          const Text('TABLEAU COMPARATIF DES BÂTIMENTS', style: AppTypography.labelSmall),
-          const SizedBox(height: 10),
-
-          // Custom Data Table
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.paper,
-              border: Border.all(color: AppColors.line),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Table(
-                columnWidths: const {
-                  0: FlexColumnWidth(1.2),
-                  1: FlexColumnWidth(1.2),
-                  2: FlexColumnWidth(1.2),
-                  3: FlexColumnWidth(1.2),
-                  4: FlexColumnWidth(1.4),
-                },
-                border: const TableBorder(
-                  horizontalInside: BorderSide(color: AppColors.line, width: 1),
-                ),
-                children: [
-                  // Table Header
-                  _buildHeaderRow(),
-                  // Data Rows
-                  _buildDataRow('Bât. A', '3 200', _getLayingRate('94%'), _getMortality('3 morts'), 'Excellent', AppColors.primaryDark),
-                  _buildDataRow('Bât. B', '3 000', _getLayingRate('91%'), _getMortality('14 morts'), 'Stable', AppColors.primary),
-                  _buildDataRow('Bât. C', '3 100', _getLayingRate('85%'), _getMortality('20 morts'), 'Vigilance', AppColors.accent),
-                  _buildDataRow('Bât. D', '3 100', _getLayingRate('72%'), _getMortality('35 morts'), 'Critique', AppColors.danger),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Summary performance cards
-          const Text('RÉSUMÉ ANALYTIQUE', style: AppTypography.labelSmall),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryCard(
-                  'Œufs récoltés',
-                  _getEggsCollected(),
-                  _periodFilter == 'today'
-                      ? 'Aujourd\'hui'
-                      : (_periodFilter == '30j' ? 'Mois en cours' : '7 derniers jours'),
-                  Icons.egg,
-                  AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildSummaryCard(
-                  'Mortalité totale',
-                  _getMortalityTotalText(),
-                  _periodFilter == 'today'
-                      ? 'Aujourd\'hui'
-                      : (_periodFilter == '30j' ? 'Mois en cours' : '7 derniers jours'),
-                  Icons.warning,
-                  AppColors.danger,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Production chart
-          const Text('PRODUCTION D\'ŒUFS — HISTORIQUE HEBDOMADAIRE', style: AppTypography.labelSmall),
-          const SizedBox(height: 4),
-          const Text('Nombre d\'œufs (Plateaux de 30)', style: TextStyle(fontSize: 11, color: AppColors.inkSoft, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 180, // Increased height from 120 to 180 (Aussi augmente la taille des graphiques)
-            child: Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _buildChartBar(0.40, 'L', false),
-                _buildChartBar(0.58, 'M', false),
-                _buildChartBar(0.35, 'M', false, isLight: true),
-                _buildChartBar(0.64, 'J', false),
-                _buildChartBar(0.70, 'V', false),
-                _buildChartBar(0.85, 'S', true),
-                _buildChartBar(0.60, 'D', false),
+                _buildPeriodChip(
+                  'Aujourd\'hui',
+                  _periodFilter == 'today',
+                  () {
+                    setState(() => _periodFilter = 'today');
+                    _loadStatsData();
+                  },
+                ),
+                _buildPeriodChip(
+                  '7 jours',
+                  _periodFilter == '7j',
+                  () {
+                    setState(() => _periodFilter = '7j');
+                    _loadStatsData();
+                  },
+                ),
+                _buildPeriodChip(
+                  'Mois en cours',
+                  _periodFilter == '30j',
+                  () {
+                    setState(() => _periodFilter = '30j');
+                    _loadStatsData();
+                  },
+                ),
+                _buildPeriodChip(
+                  'Personnalisé',
+                  _periodFilter == 'custom',
+                  () async {
+                    final picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2025),
+                      lastDate: DateTime(2027),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _periodFilter = 'custom';
+                        _selectedDateRange = picked;
+                      });
+                      _loadStatsData();
+                    }
+                  },
+                ),
               ],
             ),
-          ),
-        ],
+            if (_periodFilter == 'custom' && _selectedDateRange != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Période : ${_formatDate(_selectedDateRange!.start)} au ${_formatDate(_selectedDateRange!.end)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+
+            const Text(
+              'TABLEAU COMPARATIF DES BÂTIMENTS',
+              style: AppTypography.labelSmall,
+            ),
+            const SizedBox(height: 10),
+
+            // Custom Data Table
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.paper,
+                border: Border.all(color: AppColors.line),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(1.2),
+                    1: FlexColumnWidth(1.2),
+                    2: FlexColumnWidth(1.2),
+                    3: FlexColumnWidth(1.2),
+                    4: FlexColumnWidth(1.4),
+                  },
+                  border: const TableBorder(
+                    horizontalInside: BorderSide(
+                      color: AppColors.line,
+                      width: 1,
+                    ),
+                  ),
+                  children: [
+                    // Table Header
+                    _buildHeaderRow(),
+                    // Dynamic Data Rows
+                    if (_buildingsData.isEmpty)
+                      const TableRow(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 20,
+                              horizontal: 8,
+                            ),
+                            child: Text(
+                              'Aucun bâtiment trouvé',
+                              style: TextStyle(
+                                color: AppColors.inkSoft,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          SizedBox(),
+                          SizedBox(),
+                          SizedBox(),
+                          SizedBox(),
+                        ],
+                      )
+                    else
+                      ..._buildingsData.map((b) {
+                        final status = b['status']?.toString() ?? 'Stable';
+                        final hexColor = b['statusColorHex']?.toString();
+                        final statusColor = _getStatusColor(status, hexColor);
+                        final name =
+                            b['buildingName']?.toString() ?? 'Bâtiment';
+                        final birds = b['birdsCount']?.toString() ?? '0';
+                        final rate = b['layingRate']?.toString() ?? '0%';
+                        final mort = b['mortality']?.toString() ?? '0 mort';
+
+                        return _buildDataRow(
+                          name,
+                          birds,
+                          rate,
+                          mort,
+                          status,
+                          statusColor,
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Summary performance cards
+            const Text('RÉSUMÉ ANALYTIQUE', style: AppTypography.labelSmall),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Œufs récoltés',
+                    _getEggsCollected(),
+                    _periodFilter == 'today'
+                        ? 'Aujourd\'hui'
+                        : (_periodFilter == '30j'
+                              ? 'Mois en cours'
+                              : '7 derniers jours'),
+                    Icons.egg,
+                    AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Mortalité totale',
+                    _getMortalityTotalText(),
+                    _periodFilter == 'today'
+                        ? 'Aujourd\'hui'
+                        : (_periodFilter == '30j'
+                              ? 'Mois en cours'
+                              : '7 derniers jours'),
+                    Icons.warning,
+                    AppColors.danger,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Production chart
+            const Text(
+              'PRODUCTION D\'ŒUFS — HISTORIQUE HEBDOMADAIRE',
+              style: AppTypography.labelSmall,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Nombre d\'œufs (Plateaux de 30)',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.inkSoft,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 180,
+              child: _buildDynamicChart(),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDynamicChart() {
+    if (_layingChartData.isEmpty) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _buildChartBar(0.15, 'L', false, 0, 0),
+          _buildChartBar(0.15, 'M', false, 0, 0),
+          _buildChartBar(0.15, 'M', false, 0, 0, isLight: true),
+          _buildChartBar(0.15, 'J', false, 0, 0),
+          _buildChartBar(0.15, 'V', false, 0, 0),
+          _buildChartBar(0.15, 'S', false, 0, 0),
+          _buildChartBar(0.15, 'D', false, 0, 0),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: _layingChartData.map((item) {
+        final double height =
+            (item['relativeHeight'] as num?)?.toDouble() ?? 0.15;
+        final String day = item['day']?.toString() ?? 'J';
+        final bool isToday = item['isToday'] == true;
+        final int eggs = (item['eggsCount'] as num?)?.toInt() ?? 0;
+        final int plates =
+            (item['platesCount'] as num?)?.toInt() ?? (eggs / 30).round();
+
+        return _buildChartBar(height, day, isToday, eggs, plates);
+      }).toList(),
     );
   }
 
@@ -228,18 +404,25 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
     String statut,
     Color statusColor,
   ) {
+    final isDanger = mortalite.contains('35') ||
+        mortalite.contains('20') ||
+        statusColor == AppColors.danger;
+
     return TableRow(
       children: [
         _buildCell(bat, isBold: true),
         _buildCell(volailles),
         _buildCell(ponte),
-        _buildCell(mortalite, textColor: (mortalite.contains('0') || mortalite.contains('1 ') || mortalite.contains('2 morts') || mortalite.contains('3 morts')) ? AppColors.inkSoft : AppColors.danger),
+        _buildCell(
+          mortalite,
+          textColor: isDanger ? AppColors.danger : AppColors.inkSoft,
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -271,6 +454,31 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
     );
   }
 
+  String _getEggsCollected() {
+    final eggs = (_statsSummary['totalEggs'] as num?)?.toInt() ?? 0;
+    return _formatNumber(eggs);
+  }
+
+  String _getMortalityTotalText() {
+    final deaths = (_statsSummary['totalDeaths'] as num?)?.toInt() ?? 0;
+    return '$deaths ${deaths > 1 ? "sujets" : "sujet"}';
+  }
+
+  String _formatNumber(int val) {
+    final str = val.toString();
+    if (str.length <= 3) return str;
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        buffer.write(' ');
+      }
+    }
+    return buffer.toString().split('').reversed.join('');
+  }
+
   Widget _buildSummaryCard(
     String label,
     String val,
@@ -290,7 +498,7 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 18),
@@ -300,9 +508,27 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10, color: AppColors.inkSoft)),
-                Text(val, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                Text(period, style: const TextStyle(fontSize: 9, color: AppColors.inkSoft)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.inkSoft,
+                  ),
+                ),
+                Text(
+                  val,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  period,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.inkSoft,
+                  ),
+                ),
               ],
             ),
           ),
@@ -318,7 +544,9 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryDark : AppColors.paper,
-          border: Border.all(color: isSelected ? AppColors.primaryDark : AppColors.line),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryDark : AppColors.line,
+          ),
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(
@@ -333,19 +561,21 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
     );
   }
 
-  Widget _buildChartBar(double heightFactor, String label, bool highlight, {bool isLight = false}) {
+  Widget _buildChartBar(
+    double heightFactor,
+    String label,
+    bool highlight,
+    int eggCount,
+    int plateCount, {
+    bool isLight = false,
+  }) {
     Color barColor = AppColors.primary;
     if (highlight) barColor = AppColors.accent;
     if (isLight) barColor = AppColors.primaryLight;
 
-    // Numerical calculation for eggs and plates labels above chart bars
-    final int eggCount = (heightFactor * 3000).toInt();
-    final int plateCount = (eggCount / 30).round();
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // Display counts on top of bars (Nombre d'oeufs ou plateaux)
         Text(
           '$eggCount\n($plateCount pl.)',
           textAlign: TextAlign.center,
@@ -357,8 +587,8 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
         ),
         const SizedBox(height: 6),
         Container(
-          height: 120 * heightFactor, // Increased visual height inside the 180px parent
-          width: 18, // Slightly wider for visual premium feel
+          height: 120 * heightFactor.clamp(0.15, 1.0),
+          width: 18,
           decoration: BoxDecoration(
             color: barColor,
             border: isLight ? Border.all(color: const Color(0xFFCFE3CF)) : null,
@@ -382,3 +612,4 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 }
+

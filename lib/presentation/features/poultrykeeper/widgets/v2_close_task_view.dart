@@ -21,6 +21,16 @@ class V2CloseTaskView extends StatefulWidget {
 class _V2CloseTaskViewState extends State<V2CloseTaskView> {
   // Feed distribution states
   int _feedQty = 75;
+  final TextEditingController _feedCommentController = TextEditingController();
+
+  // Sanitary treatments (Vitamine, Déparasitant, Vaccination, Injection)
+  int _doseQty = 1;
+  final TextEditingController _sanitaryCommentController = TextEditingController();
+
+  // Weighing (Pesée)
+  double _weightVal = 1.85; // kg
+  final TextEditingController _weightController = TextEditingController(text: '1.85');
+  final TextEditingController _weighingCommentController = TextEditingController();
 
   // Egg collection states
   int _eggsPlusGros = 120;
@@ -35,14 +45,20 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
 
   // Cleaning states
   bool _cleaningConfirmed = false;
+  final TextEditingController _cleaningCommentController = TextEditingController();
 
   // Temperature states
   int _temperatureVal = 24;
 
   @override
   void dispose() {
+    _feedCommentController.dispose();
+    _sanitaryCommentController.dispose();
+    _weightController.dispose();
+    _weighingCommentController.dispose();
     _eggObservationController.dispose();
     _generalObservationController.dispose();
+    _cleaningCommentController.dispose();
     for (final controller in _eggFormatControllers.values) {
       controller.dispose();
     }
@@ -62,9 +78,51 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
           'meta': 'Bâtiment A · Lot L-2026-011',
         };
 
-    final title = task['title'] as String;
+    final title = (task['title'] as String? ?? '').toLowerCase();
+    final desc = (task['description'] as String? ?? '').toLowerCase();
     final taskType = (task['taskType'] as String? ?? '').toLowerCase();
-    final typeOrTitle = taskType.isEmpty ? title.toLowerCase() : taskType;
+    final combined = '$title $desc $taskType';
+
+    final bool isFeeding = taskType == 'feeding' ||
+        combined.contains('aliment') ||
+        combined.contains('abrev') ||
+        combined.contains('nourr');
+
+    final bool isSanitary = taskType == 'treatment' ||
+        taskType == 'vaccination' ||
+        combined.contains('vitamine') ||
+        combined.contains('vitamin') ||
+        combined.contains('injection') ||
+        combined.contains('inject') ||
+        combined.contains('deparasitant') ||
+        combined.contains('déparasitant') ||
+        combined.contains('parasit') ||
+        combined.contains('vaccin') ||
+        combined.contains('traitement') ||
+        combined.contains('soin') ||
+        combined.contains('veto') ||
+        combined.contains('médicament') ||
+        combined.contains('medicament');
+
+    final bool isWeighing = taskType == 'inspection' ||
+        combined.contains('pes') ||
+        combined.contains('poids');
+
+    final bool isEggCollection = taskType == 'egg_collection' ||
+        combined.contains('oeuf') ||
+        combined.contains('œuf') ||
+        combined.contains('ramassage') ||
+        combined.contains('ponte') ||
+        combined.contains('collecte');
+
+    final bool isCleaning = taskType == 'cleaning' ||
+        combined.contains('nettoy') ||
+        combined.contains('desinfect') ||
+        combined.contains('désinfect') ||
+        combined.contains('lavage');
+
+    final bool isTemperature = combined.contains('température') ||
+        combined.contains('temperature');
 
     return SingleChildScrollView(
       child: Column(
@@ -86,14 +144,14 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        task['title'] as String? ?? 'Tâche',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
                       ),
                       Text(
-                        task['meta'] as String,
+                        task['meta'] as String? ?? '',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.inkSoft,
@@ -108,17 +166,17 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
           const SizedBox(height: 20),
 
           // Render specific form based on task type
-          if (typeOrTitle == 'feeding' || typeOrTitle.contains('aliment'))
+          if (isFeeding)
             _buildFeedDistributionForm()
-          else if (typeOrTitle == 'egg_collection' ||
-              typeOrTitle.contains('œuf') ||
-              typeOrTitle.contains('oeuf'))
+          else if (isSanitary)
+            _buildSanitaryTreatmentForm()
+          else if (isWeighing)
+            _buildWeighingForm()
+          else if (isEggCollection)
             _buildEggCollectionForm()
-          else if (typeOrTitle == 'cleaning' || typeOrTitle.contains('nettoy'))
+          else if (isCleaning)
             _buildCleaningForm()
-          else if (typeOrTitle == 'inspection' ||
-              typeOrTitle.contains('température') ||
-              typeOrTitle.contains('temperature'))
+          else if (isTemperature)
             _buildTemperatureForm()
           else
             _buildDefaultCloseForm(),
@@ -127,16 +185,16 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     );
   }
 
-  // --- FORM A: FEED DISTRIBUTION ---
+  // --- FORM A: FEED DISTRIBUTION (Alimentation et abreuvage) ---
   Widget _buildFeedDistributionForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('QUANTITÉ DISTRIBUÉE', style: AppTypography.label),
+        const Text('QUANTITÉ D\'ALIMENT DISTRIBUÉ', style: AppTypography.label),
         const SizedBox(height: 6),
         CounterBox(
           initialValue: _feedQty,
-          unit: 'kilogrammes',
+          unit: 'kilogrammes (kg)',
           onChanged: (val) => setState(() => _feedQty = val),
         ),
         const SizedBox(height: 12),
@@ -151,6 +209,13 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             _buildPresetButton(100),
           ],
         ),
+        const SizedBox(height: 14),
+        const Text('COMMENTAIRE / OBSERVATION', style: AppTypography.label),
+        const SizedBox(height: 6),
+        AppInputBox(
+          placeholder: 'Précisez l\'état des mangeoires, abreuvoirs…',
+          controller: _feedCommentController,
+        ),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -164,7 +229,11 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             Expanded(
               child: ElevatedButton(
                 onPressed: () async {
-                  await widget.onDone({'feedQtyKg': _feedQty.toDouble()});
+                  await widget.onDone({
+                    'feedQtyKg': _feedQty.toDouble(),
+                    'notes': _feedCommentController.text.trim(),
+                    'confirmed': true,
+                  });
                 },
                 child: const Text('Confirmer'),
               ),
@@ -203,7 +272,136 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     );
   }
 
-  // --- FORM B: EGG COLLECTION ---
+  // --- FORM B: SANITARY TREATMENTS (Vitamine, Déparasitant, Vaccination, Injection) ---
+  Widget _buildSanitaryTreatmentForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('QUANTITÉ DOSE UTILISÉE', style: AppTypography.label),
+        const SizedBox(height: 6),
+        CounterBox(
+          initialValue: _doseQty,
+          unit: 'dose(s) / flacon(s)',
+          onChanged: (val) => setState(() => _doseQty = val),
+        ),
+        const SizedBox(height: 14),
+        const Text('COMMENTAIRE / OBSERVATION', style: AppTypography.label),
+        const SizedBox(height: 6),
+        AppInputBox(
+          placeholder: 'Nom du produit, mode d\'administration ou réaction…',
+          controller: _sanitaryCommentController,
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: widget.onCancel,
+                child: const Text('Annuler'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  await widget.onDone({
+                    'dose': _doseQty.toDouble(),
+                    'notes': _sanitaryCommentController.text.trim(),
+                    'confirmed': true,
+                  });
+                },
+                child: const Text('Confirmer'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- FORM C: WEIGHING (Pesée) ---
+  Widget _buildWeighingForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('POIDS MOYEN CONSTATÉ (KG)', style: AppTypography.label),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.paper,
+            border: Border.all(color: AppColors.line),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.scale, color: AppColors.primaryDark, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    hintText: 'Ex : 1.85',
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onChanged: (val) {
+                    final p = double.tryParse(val.replaceAll(',', '.'));
+                    if (p != null) _weightVal = p;
+                  },
+                ),
+              ),
+              const Text(
+                'kg / sujet',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.inkSoft,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Text('COMMENTAIRE / OBSERVATION', style: AppTypography.label),
+        const SizedBox(height: 6),
+        AppInputBox(
+          placeholder: 'Échantillon pesé, uniformité du lot…',
+          controller: _weighingCommentController,
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: widget.onCancel,
+                child: const Text('Annuler'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  final parsedWeight = double.tryParse(
+                    _weightController.text.replaceAll(',', '.').trim(),
+                  ) ?? _weightVal;
+                  await widget.onDone({
+                    'weight': parsedWeight,
+                    'notes': _weighingCommentController.text.trim(),
+                    'confirmed': true,
+                  });
+                },
+                child: const Text('Confirmer'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- FORM D: EGG COLLECTION ---
   Widget _buildEggCollectionForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,6 +486,7 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
                     'eggsMoyen': _eggsMoyen,
                     'eggsPetit': _eggsPetit,
                     'notes': _eggObservationController.text.trim(),
+                    'confirmed': true,
                   });
                 },
                 child: const Text('Enregistrer'),
@@ -299,7 +498,7 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     );
   }
 
-  // --- FORM C: CLEANING ---
+  // --- FORM E: CLEANING ---
   Widget _buildCleaningForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,6 +531,13 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             ],
           ),
         ),
+        const SizedBox(height: 14),
+        const Text('COMMENTAIRE / OBSERVATION', style: AppTypography.label),
+        const SizedBox(height: 6),
+        AppInputBox(
+          placeholder: 'Produits utilisés, litière changée…',
+          controller: _cleaningCommentController,
+        ),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -347,7 +553,10 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
                 onPressed: !_cleaningConfirmed
                     ? null
                     : () async {
-                        await widget.onDone({'confirmed': true});
+                        await widget.onDone({
+                          'confirmed': true,
+                          'notes': _cleaningCommentController.text.trim(),
+                        });
                       },
                 child: const Text('Confirmer'),
               ),
@@ -358,7 +567,7 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     );
   }
 
-  // --- FORM D: TEMPERATURE ---
+  // --- FORM F: TEMPERATURE ---
   Widget _buildTemperatureForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,6 +594,7 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
                 onPressed: () async {
                   await widget.onDone({
                     'temperatureCelsius': _temperatureVal.toDouble(),
+                    'confirmed': true,
                   });
                 },
                 child: const Text('Confirmer'),
@@ -396,7 +606,7 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     );
   }
 
-  // --- FORM E: DEFAULT GENERAL CLOSE ---
+  // --- FORM G: DEFAULT GENERAL CLOSE ---
   Widget _buildDefaultCloseForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

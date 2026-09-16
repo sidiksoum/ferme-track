@@ -435,7 +435,13 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
       if (decoded is Map) {
         final lines = <String>[];
         if (decoded['feedQtyKg'] != null) {
-          lines.add('Quantité distribuée : ${decoded['feedQtyKg']} kg');
+          lines.add('Quantité d\'aliment distribué : ${decoded['feedQtyKg']} kg');
+        }
+        if (decoded['dose'] != null) {
+          lines.add('Quantité dose utilisée : ${decoded['dose']}');
+        }
+        if (decoded['weight'] != null) {
+          lines.add('Poids moyen constaté : ${decoded['weight']} kg');
         }
         if (decoded['eggsProduced'] != null) {
           lines.add('Œufs produits : ${decoded['eggsProduced']}');

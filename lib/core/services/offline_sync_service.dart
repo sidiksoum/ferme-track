@@ -105,8 +105,8 @@ class OfflineSyncService extends ChangeNotifier {
         }
       });
 
-      // Synchronisation périodique de sécurité (toutes les 3 minutes si des éléments sont en attente)
-      _periodicSyncTimer = Timer.periodic(const Duration(minutes: 3), (_) async {
+      // Synchronisation périodique de sécurité (toutes les 30 secondes si des éléments sont en attente)
+      _periodicSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
         if (pendingOperationsCount > 0 && await _networkChecker.hasConnection) {
           syncPendingOperations();
         }

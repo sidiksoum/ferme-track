@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../core/interfaces/network_checker.dart';
+import '../../../../core/services/offline_sync_service.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class V3V6AnomalyView extends StatefulWidget {
@@ -10,6 +14,10 @@ class V3V6AnomalyView extends StatefulWidget {
 }
 
 class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
+  final ApiClient _apiClient = getIt<ApiClient>();
+  final NetworkChecker _networkChecker = getIt<NetworkChecker>();
+  final OfflineSyncService _syncService = getIt<OfflineSyncService>();
+
   String _activeTab = 'mortality'; // mortality, other
 
   // Mortality states
@@ -24,11 +32,230 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
   String _anomalySeverity = 'high'; // low, high
   final TextEditingController _anomalyNotesController = TextEditingController();
 
+  List<String> _buildingsList = ['Bâtiment A', 'Bâtiment B', 'Bâtiment C', 'Bâtiment D'];
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBuildings();
+  }
+
+  Future<void> _loadBuildings() async {
+    try {
+      dynamic response;
+      try {
+        response = await _apiClient.get('/volailler/buildings', useCache: true);
+      } catch (_) {
+        response = await _apiClient.get('/buildings', useCache: true);
+      }
+
+      if (response is List && response.isNotEmpty) {
+        final names = <String>[];
+        for (final item in response) {
+          if (item is Map && item['name'] != null) {
+            names.add(item['name'].toString());
+          } else if (item is String && item.isNotEmpty) {
+            names.add(item);
+          }
+        }
+        if (names.isNotEmpty && mounted) {
+          setState(() {
+            _buildingsList = names;
+            if (!_buildingsList.contains(_mortalityBuilding)) {
+              _mortalityBuilding = _buildingsList.first;
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _anomalyNotesController.dispose();
     _mortalityCommentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitMortality() async {
+    if (_mortalityCommentController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez ajouter un commentaire explicatif'),
+        ),
+      );
+      return;
+    }
+
+    final causeMap = {
+      'heat': 'Chaleur',
+      'disease': 'Maladie',
+      'unknown': 'Inconnue',
+    };
+
+    final payload = {
+      'buildingName': _mortalityBuilding,
+      'mortalityCount': _mortalityCount,
+      'mortalityCause': causeMap[_mortalityCause] ?? _mortalityCause,
+      'description': _mortalityCommentController.text.trim(),
+    };
+
+    setState(() => _isSubmitting = true);
+    showActionLoadingDialog(context, message: 'Envoi de la déclaration...');
+
+    try {
+      final isOnline = await _networkChecker.hasConnection;
+      if (!isOnline) {
+        await _syncService.enqueueOperation(
+          endpoint: '/volailler/anomalies/mortality',
+          method: 'POST',
+          payload: payload,
+          description: 'Mortalité: $_mortalityCount sujets ($_mortalityBuilding)',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text('Mortalité enregistrée hors-ligne ! Synchronisation automatique.'),
+            ),
+          );
+        }
+      } else {
+        await _apiClient.post('/volailler/anomalies/mortality', data: payload);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppColors.syncGreen,
+              content: Text('Déclaration de mortalité enregistrée avec succès !'),
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _mortalityCount = 3;
+          _mortalityCause = 'heat';
+          _mortalityCommentController.clear();
+        });
+      }
+    } catch (e) {
+      // Fallback offline
+      try {
+        await _syncService.enqueueOperation(
+          endpoint: '/volailler/anomalies/mortality',
+          method: 'POST',
+          payload: payload,
+          description: 'Mortalité: $_mortalityCount sujets ($_mortalityBuilding)',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text('Enregistré localement pour synchronisation.'),
+            ),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur : $e')),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+  }
+
+  Future<void> _submitOtherAnomaly() async {
+    if (_anomalyNotesController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez détailler le problème rencontré'),
+        ),
+      );
+      return;
+    }
+
+    final payload = {
+      'anomalyType': _anomalyType,
+      'severity': _anomalySeverity,
+      'description': _anomalyNotesController.text.trim(),
+    };
+
+    setState(() => _isSubmitting = true);
+    showActionLoadingDialog(context, message: 'Envoi du signalement...');
+
+    try {
+      final isOnline = await _networkChecker.hasConnection;
+      if (!isOnline) {
+        await _syncService.enqueueOperation(
+          endpoint: '/volailler/anomalies/other',
+          method: 'POST',
+          payload: payload,
+          description: 'Anomalie $_anomalyType',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text('Signalement enregistré hors-ligne ! Synchronisation automatique.'),
+            ),
+          );
+        }
+      } else {
+        await _apiClient.post('/volailler/anomalies/other', data: payload);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppColors.syncGreen,
+              content: Text('Signalement d\'anomalie envoyé avec succès !'),
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _anomalyNotesController.clear();
+          _anomalyType = 'technical';
+          _anomalySeverity = 'high';
+        });
+      }
+    } catch (e) {
+      try {
+        await _syncService.enqueueOperation(
+          endpoint: '/volailler/anomalies/other',
+          method: 'POST',
+          payload: payload,
+          description: 'Anomalie $_anomalyType',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text('Enregistré localement pour synchronisation.'),
+            ),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur : $e')),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
   }
 
   @override
@@ -124,9 +351,11 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         const Text('BÂTIMENT CONCERNÉ', style: AppTypography.label),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: _mortalityBuilding,
+          value: _buildingsList.contains(_mortalityBuilding)
+              ? _mortalityBuilding
+              : _buildingsList.first,
           decoration: const InputDecoration(border: OutlineInputBorder()),
-          items: const ['Bâtiment A', 'Bâtiment B', 'Bâtiment C', 'Bâtiment D']
+          items: _buildingsList
               .map(
                 (building) =>
                     DropdownMenuItem(value: building, child: Text(building)),
@@ -141,26 +370,7 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {
-              if (_mortalityCommentController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Veuillez ajouter un commentaire explicatif'),
-                  ),
-                );
-                return;
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Déclaration de mortalité enregistrée'),
-                ),
-              );
-              setState(() {
-                _mortalityCount = 3;
-                _mortalityCause = 'heat';
-                _mortalityCommentController.clear();
-              });
-            },
+            onPressed: _isSubmitting ? null : _submitMortality,
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Envoyer la déclaration'),
           ),
@@ -204,30 +414,19 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         ),
         const SizedBox(height: 14),
 
-        const Text('DESCRIPTION / NOTES', style: AppTypography.label),
+        const Text('DESCRIPTION / NOTES (REQUIS)', style: AppTypography.label),
         const SizedBox(height: 6),
         AppInputBox(
           placeholder: 'Détaillez le problème rencontré...',
           maxLines: 3,
           controller: _anomalyNotesController,
         ),
-        const SizedBox(height: 14),
-
         const SizedBox(height: 24),
 
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Signalement d\'anomalie envoyé')),
-              );
-              setState(() {
-                _anomalyNotesController.clear();
-                _anomalyType = 'technical';
-                _anomalySeverity = 'high';
-              });
-            },
+            onPressed: _isSubmitting ? null : _submitOtherAnomaly,
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Envoyer le signalement'),
           ),
