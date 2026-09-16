@@ -43,12 +43,7 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
 
   Future<void> _loadBuildings() async {
     try {
-      dynamic response;
-      try {
-        response = await _apiClient.get('/volailler/buildings', useCache: true);
-      } catch (_) {
-        response = await _apiClient.get('/buildings', useCache: true);
-      }
+      final response = await _apiClient.get('/buildings', useCache: true);
 
       if (response is List && response.isNotEmpty) {
         final names = <String>[];

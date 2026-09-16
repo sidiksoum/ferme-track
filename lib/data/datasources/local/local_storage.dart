@@ -36,8 +36,11 @@ class LocalStorageImpl implements LocalStorage {
   Future<String?> getString(String key) async {
     try {
       return await _secureStorage.read(key: key);
-    } catch (e, stackTrace) {
-      AppLogger.error('Error reading string: $key', e, stackTrace);
+    } catch (e) {
+      AppLogger.warning('Erreur lecture clé sécurisée ($key), réinitialisation: $e');
+      try {
+        await _secureStorage.delete(key: key);
+      } catch (_) {}
       return null;
     }
   }
