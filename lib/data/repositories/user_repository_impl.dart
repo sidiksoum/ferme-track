@@ -19,10 +19,11 @@ class UserRepositoryImpl implements UserRepository {
   });
 
   String _mapRoleToBackend(String role) {
-    if (role == 'directeur') return 'director';
-    if (role == 'technicien') return 'technician';
-    if (role == 'magasinier') return 'warehouse';
-    if (role == 'volailler') return 'poultrykeeper';
+    final r = role.trim().toLowerCase();
+    if (r == 'directeur' || r == 'director') return 'director';
+    if (r == 'technicien' || r == 'technician') return 'technician';
+    if (r == 'magasinier' || r == 'warehouse') return 'warehouse';
+    if (r == 'volailler' || r == 'poultrykeeper') return 'poultrykeeper';
     return role;
   }
 

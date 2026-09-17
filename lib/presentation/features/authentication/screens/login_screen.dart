@@ -174,7 +174,21 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _navigateToHome(BuildContext context, String? role) {
-    // TODO: Routing d'accueil selon le rôle
+    if (role == null) return;
+    final r = role.trim().toLowerCase();
+    String route;
+    if (r == 'director' || r == 'directeur') {
+      route = '/director';
+    } else if (r == 'poultrykeeper' || r == 'volailler') {
+      route = '/poultrykeeper';
+    } else if (r == 'warehouse' || r == 'magasinier') {
+      route = '/warehouse';
+    } else if (r == 'technician' || r == 'technicien') {
+      route = '/technician';
+    } else {
+      return;
+    }
+    Navigator.of(context).pushReplacementNamed(route);
   }
 }
 

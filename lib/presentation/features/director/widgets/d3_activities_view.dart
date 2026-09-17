@@ -62,15 +62,17 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
         _activities =
             response.whereType<Map>().map((raw) {
               final item = Map<String, dynamic>.from(raw);
-              final status = item['status']?.toString();
+              final status = item['status']?.toString()?.toLowerCase();
               return {
                 ...item,
-                'status': status == 'done'
+                'status': (status == 'done' || status == 'completed')
                     ? TaskStatus.done
-                    : status == 'pending_validation'
+                    : (status == 'pending_validation' || status == 'submitted')
                     ? TaskStatus.pendingValidation
                     : status == 'partial'
                     ? TaskStatus.partial
+                    : status == 'in_progress'
+                    ? TaskStatus.inProgress
                     : status == 'late'
                     ? TaskStatus.late
                     : TaskStatus.todo,
@@ -104,6 +106,7 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
       }
       if (_activitiesTab == 'planned') {
         return act['status'] == TaskStatus.todo ||
+            act['status'] == TaskStatus.inProgress ||
             act['status'] == TaskStatus.late ||
             act['status'] == TaskStatus.partial ||
             act['status'] == TaskStatus.pendingValidation;

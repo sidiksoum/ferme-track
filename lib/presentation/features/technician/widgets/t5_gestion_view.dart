@@ -572,14 +572,14 @@ class _T5GestionViewState extends State<T5GestionView> {
                     ),
                     tooltip: 'Modifier',
                   ),
-                  //IconButton(
-                  //onPressed: () => _deleteBuilding(building),
-                  //icon: const Icon(
-                  //Icons.delete_outline,
-                  //color: AppColors.danger,
-                  //),
-                  //tooltip: 'Supprimer',
-                  //),
+                  IconButton(
+                    onPressed: () => _deleteBuilding(building),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: AppColors.danger,
+                    ),
+                    tooltip: 'Supprimer',
+                  ),
                 ],
               ),
             ],

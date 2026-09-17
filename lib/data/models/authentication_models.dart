@@ -27,11 +27,12 @@ class UserRemoteDto {
   });
 
   User toEntity() {
+    final r = role.trim().toLowerCase();
     String mappedRole = role;
-    if (role == 'director') mappedRole = 'directeur';
-    if (role == 'technician') mappedRole = 'technicien';
-    if (role == 'warehouse') mappedRole = 'magasinier';
-    if (role == 'poultrykeeper') mappedRole = 'volailler';
+    if (r == 'director' || r == 'directeur') mappedRole = 'directeur';
+    if (r == 'technician' || r == 'technicien') mappedRole = 'technicien';
+    if (r == 'warehouse' || r == 'magasinier') mappedRole = 'magasinier';
+    if (r == 'poultrykeeper' || r == 'volailler') mappedRole = 'volailler';
 
     return User(
       id: id,
@@ -142,12 +143,19 @@ class UserLocalDto {
   });
 
   User toEntity() {
+    final r = role.trim().toLowerCase();
+    String mappedRole = role;
+    if (r == 'director' || r == 'directeur') mappedRole = 'directeur';
+    if (r == 'technician' || r == 'technicien') mappedRole = 'technicien';
+    if (r == 'warehouse' || r == 'magasinier') mappedRole = 'magasinier';
+    if (r == 'poultrykeeper' || r == 'volailler') mappedRole = 'volailler';
+
     return User(
       id: id,
       username: username,
       email: email,
       fullName: fullName,
-      role: role,
+      role: mappedRole,
       farmId: farmId,
       avatarUrl: avatarUrl,
       isActive: true,

@@ -169,7 +169,7 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
           ..clear()
           ..addAll(
             response.whereType<Map>().map((item) {
-              final status = item['status']?.toString();
+              final status = item['status']?.toString().toLowerCase();
               final building = item['building']?.toString();
               final startTime = item['startTime']?.toString() ?? '';
               final responsibleLabel = item['responsibleName']?.toString();
@@ -179,9 +179,9 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                 'meta': [startTime, responsibleLabel]
                     .where((value) => value != null && value.isNotEmpty)
                     .join(' · '),
-                'status': status == 'done'
+                'status': (status == 'done' || status == 'completed')
                     ? TaskStatus.done
-                    : status == 'pending_validation'
+                    : (status == 'pending_validation' || status == 'submitted')
                         ? TaskStatus.pendingValidation
                         : status == 'in_progress'
                             ? TaskStatus.inProgress

@@ -71,22 +71,44 @@ class _T3StockViewState extends State<T3StockView> {
         _stockItems
           ..clear()
           ..addAll(
-            response.whereType<Map>().map((item) {
-              final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-              final threshold = (item['alertThreshold'] as num?)?.toDouble() ?? 10.0;
-              final status = item['status']?.toString() ?? (qty <= 10.0 ? 'Critique' : (qty <= 25.0 ? 'Bas' : 'OK'));
-              final percent = (item['percent'] as num?)?.toDouble() ?? (qty / (threshold * 3)).clamp(0.05, 1.0);
+            response
+                .whereType<Map>()
+                .where((item) {
+                  final name = item['name']?.toString().toLowerCase() ?? '';
+                  final cat = item['category']?.toString().toLowerCase() ?? '';
+                  // Exclure les stocks d'œufs (gérés par le magasinier) du stock ferme technicien
+                  if (name.contains('oeuf') ||
+                      name.contains('œuf') ||
+                      name.contains('alveole') ||
+                      cat == 'egg' ||
+                      cat == 'sales_product') {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((item) {
+                  final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+                  final threshold =
+                      (item['alertThreshold'] as num?)?.toDouble() ?? 10.0;
+                  final status =
+                      item['status']?.toString() ??
+                      (qty <= 10.0
+                          ? 'Critique'
+                          : (qty <= 25.0 ? 'Bas' : 'OK'));
+                  final percent =
+                      (item['percent'] as num?)?.toDouble() ??
+                      (qty / (threshold * 3)).clamp(0.05, 1.0);
 
-              return {
-                'id': item['id']?.toString() ?? '',
-                'name': item['name']?.toString() ?? 'Article',
-                'quantity': qty.toInt(),
-                'unit': item['unit']?.toString() ?? 'unités',
-                'status': status,
-                'percent': percent,
-                'alertThreshold': threshold,
-              };
-            }),
+                  return {
+                    'id': item['id']?.toString() ?? '',
+                    'name': item['name']?.toString() ?? 'Article',
+                    'quantity': qty.toInt(),
+                    'unit': item['unit']?.toString() ?? 'unités',
+                    'status': status,
+                    'percent': percent,
+                    'alertThreshold': threshold,
+                  };
+                }),
           );
       });
     } catch (_) {

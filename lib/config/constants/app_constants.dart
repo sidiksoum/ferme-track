@@ -3,7 +3,7 @@ class AppConstants {
   // App Info
   static const String appName = 'Ferme Track';
   static const String appVersion = '1.0.0';
-  static const String farmName = 'Ferme Korhogo';
+  static const String farmName = 'Ferme SORO';
 
   // API Configuration
   static const String baseUrl = 'https://api-ferme-track.onrender.com/api/v1';

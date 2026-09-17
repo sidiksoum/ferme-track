@@ -156,20 +156,19 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
   }
 
   void _navigateToHome(String? role) {
+    if (role == null) return;
+    final r = role.trim().toLowerCase();
     String route;
-    switch (role) {
-      case AppConstants.roleDirector:
-        route = '/director';
-        break;
-      case AppConstants.rolePoultryKeeper:
-        route = '/poultrykeeper';
-        break;
-      case AppConstants.roleWarehouseManager:
-        route = '/warehouse';
-        break;
-      case AppConstants.roleTechnician:
-      default:
-        route = '/login';
+    if (r == 'director' || r == 'directeur') {
+      route = '/director';
+    } else if (r == 'poultrykeeper' || r == 'volailler') {
+      route = '/poultrykeeper';
+    } else if (r == 'warehouse' || r == 'magasinier') {
+      route = '/warehouse';
+    } else if (r == 'technician' || r == 'technicien') {
+      route = '/technician';
+    } else {
+      route = '/login';
     }
 
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -215,17 +214,16 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
   }
 
   Widget _buildHomeScreen(String role) {
-    switch (role) {
-      case AppConstants.roleDirector:
-        return const DirectorDashboardScreen();
-      case AppConstants.rolePoultryKeeper:
-        return const PoltrykeeperTasksScreen();
-      case AppConstants.roleWarehouseManager:
-        return const SalesScreen();
-      case AppConstants.roleTechnician:
-        return const PlanningScreen();
-      default:
-        return const LoginScreen();
+    final r = role.trim().toLowerCase();
+    if (r == 'director' || r == 'directeur') {
+      return const DirectorDashboardScreen();
+    } else if (r == 'poultrykeeper' || r == 'volailler') {
+      return const PoltrykeeperTasksScreen();
+    } else if (r == 'warehouse' || r == 'magasinier') {
+      return const SalesScreen();
+    } else if (r == 'technician' || r == 'technicien') {
+      return const PlanningScreen();
     }
+    return const LoginScreen();
   }
 }

@@ -266,11 +266,12 @@ class _UserManagementViewState extends State<UserManagementView> {
                   itemCount: _usersList.length,
                   itemBuilder: (context, index) {
                     final user = _usersList[index];
+                    final r = user.role.trim().toLowerCase();
                     IconData roleIcon = Icons.person;
-                    if (user.role == 'directeur') roleIcon = Icons.admin_panel_settings;
-                    if (user.role == 'technicien') roleIcon = Icons.engineering;
-                    if (user.role == 'volailler') roleIcon = Icons.agriculture;
-                    if (user.role == 'magasinier') roleIcon = Icons.store;
+                    if (r == 'directeur' || r == 'director') roleIcon = Icons.admin_panel_settings;
+                    if (r == 'technicien' || r == 'technician') roleIcon = Icons.engineering;
+                    if (r == 'volailler' || r == 'poultrykeeper') roleIcon = Icons.agriculture;
+                    if (r == 'magasinier' || r == 'warehouse') roleIcon = Icons.store;
 
                     return Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
