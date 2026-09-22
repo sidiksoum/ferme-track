@@ -985,7 +985,7 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                                 ),
                               ),
                             );
-                            _loadReceptions();
+                            _loadReceptions(forceRefresh: true);
                           }
                         } catch (e) {
                           try {
@@ -1035,7 +1035,7 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                                   content: Text('Connexion instable : validation enregistrée localement pour synchronisation.'),
                                 ),
                               );
-                              _loadReceptions();
+                              _loadReceptions(forceRefresh: true);
                             }
                           } catch (_) {
                             if (mounted) {

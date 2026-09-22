@@ -50,10 +50,12 @@ class _D5D4SalesStockViewState extends State<D5D4SalesStockView> {
     // Realtime Socket.IO synchronization
     _socketSubscription = _socketService.allEvents.listen((event) {
       final evt = event['event']?.toString() ?? '';
-      if (evt == 'sale:created' ||
-          evt == 'stock:updated' ||
+      if (evt.contains('sale') ||
+          evt.contains('stock') ||
           evt.contains('refund') ||
-          evt.contains('reception')) {
+          evt.contains('reception') ||
+          evt.contains('egg') ||
+          evt.contains('order')) {
         if (mounted) {
           _loadAllData(forceRefresh: true);
         }
@@ -91,7 +93,7 @@ class _D5D4SalesStockViewState extends State<D5D4SalesStockView> {
         ),
       ]);
 
-      if (mounted && responses[0] is List && (responses[0] as List).isNotEmpty) {
+      if (mounted && responses[0] is List) {
         _salesHistory = (responses[0] as List).map<Map<String, dynamic>>((s) {
           DateTime date;
           try {
@@ -120,7 +122,7 @@ class _D5D4SalesStockViewState extends State<D5D4SalesStockView> {
         }).toList();
       }
 
-      if (mounted && responses[1] is List && (responses[1] as List).isNotEmpty) {
+      if (mounted && responses[1] is List) {
         _debtors = (responses[1] as List).map<Map<String, dynamic>>((d) {
           return {
             'client_id': d['client_id']?.toString() ?? d['id']?.toString() ?? '',

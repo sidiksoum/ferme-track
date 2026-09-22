@@ -262,6 +262,27 @@ class SocketClientService extends ChangeNotifier {
     });
   }
 
+  /// Émet un événement local pour notifier immédiatement tous les écrans lors d'une mutation (POST/PUT/PATCH/DELETE)
+  void emitLocalEvent(String event, [Map<String, dynamic>? data]) {
+    final payload = {'event': event, ...(data ?? {})};
+    _allEventsController.add(payload);
+    final lower = event.toLowerCase();
+    if (lower.contains('stock') || lower.contains('egg') || lower.contains('reception')) {
+      _stockEventController.add(payload);
+    }
+    if (lower.contains('sale') || lower.contains('client') || lower.contains('caisse') || lower.contains('refund')) {
+      _saleEventController.add(payload);
+    }
+    if (lower.contains('task') || lower.contains('activit')) {
+      _taskEventController.add(payload);
+      _activityEventController.add(payload);
+    }
+    if (lower.contains('anomal') || lower.contains('mortalit')) {
+      _anomalyEventController.add(payload);
+    }
+    notifyListeners();
+  }
+
   /// Déconnexion et nettoyage
   void disconnect() {
     try {

@@ -59,7 +59,8 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
     if (widget.buildingOptions.isNotEmpty) {
       _selectedBuildingId = widget.buildingOptions.first['id'];
     }
-    final defaultLotName = 'Lot ${widget.order['ref'] ?? DateTime.now().millisecondsSinceEpoch}';
+    final defaultLotName =
+        'Lot ${widget.order['ref'] ?? DateTime.now().millisecondsSinceEpoch}';
     _lotNameController.text = defaultLotName;
   }
 
@@ -75,6 +76,7 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
   @override
   Widget build(BuildContext context) {
     final supplierName = widget.order['supplier'] ?? 'Fournisseur';
+    final quantity = widget.order['quantity']?.toString() ?? '1';
     final details = widget.order['details'] ?? 'Articles';
 
     return AlertDialog(
@@ -84,7 +86,7 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Articles attendus : $details'),
+            Text('Articles attendus : $quantity'),
             if (_isPoultryOrder) ...[
               const SizedBox(height: 14),
               const Text(
@@ -93,9 +95,14 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: widget.buildingOptions.any((b) => b['id'] == _selectedBuildingId)
+                value:
+                    widget.buildingOptions.any(
+                      (b) => b['id'] == _selectedBuildingId,
+                    )
                     ? _selectedBuildingId
-                    : (widget.buildingOptions.isNotEmpty ? widget.buildingOptions.first['id'] : null),
+                    : (widget.buildingOptions.isNotEmpty
+                          ? widget.buildingOptions.first['id']
+                          : null),
                 items: widget.buildingOptions
                     .map(
                       (building) => DropdownMenuItem(
@@ -104,10 +111,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
                       ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => _selectedBuildingId = value),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
+                onChanged: (value) =>
+                    setState(() => _selectedBuildingId = value),
+                decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -198,7 +204,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
       final lotCountStr = _lotCountController.text.trim();
       final lotName = _lotNameController.text.trim();
 
-      if (_selectedBuildingId == null || lotName.isEmpty || lotCountStr.isEmpty) {
+      if (_selectedBuildingId == null ||
+          lotName.isEmpty ||
+          lotCountStr.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -213,7 +221,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
       if (lotCount == null || lotCount <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('L\'effectif doit être un nombre positif supérieur à 0'),
+            content: Text(
+              'L\'effectif doit être un nombre positif supérieur à 0',
+            ),
           ),
         );
         return;
@@ -226,7 +236,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
             '/orders/$orderId/receive',
             data: {
               'qtyReceived': lotCount.toDouble(),
-              'comment': comment.isNotEmpty ? comment : 'Réception volaille conforme',
+              'comment': comment.isNotEmpty
+                  ? comment
+                  : 'Réception volaille conforme',
               'buildingId': _selectedBuildingId,
               'lotName': lotName,
               'lotCount': lotCount,
@@ -249,7 +261,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
       } catch (error) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Impossible de clôturer la commande : $error')),
+            SnackBar(
+              content: Text('Impossible de clôturer la commande : $error'),
+            ),
           );
         }
       } finally {
@@ -283,7 +297,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
             '/orders/$orderId/receive',
             data: {
               'qtyReceived': qty,
-              'comment': comment.isNotEmpty ? comment : 'Marchandise conforme reçue en bon état.',
+              'comment': comment.isNotEmpty
+                  ? comment
+                  : 'Marchandise conforme reçue en bon état.',
               'type': widget.order['type'] ?? 'aliment',
             },
           );
@@ -303,7 +319,9 @@ class _T2CloseOrderDialogState extends State<T2CloseOrderDialog> {
       } catch (error) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Impossible de clôturer la commande : $error')),
+            SnackBar(
+              content: Text('Impossible de clôturer la commande : $error'),
+            ),
           );
         }
       } finally {

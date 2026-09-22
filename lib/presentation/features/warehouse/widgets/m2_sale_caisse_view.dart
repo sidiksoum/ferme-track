@@ -76,7 +76,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       'date': DateTime.now().subtract(const Duration(days: 1)),
       'client': 'Adjoua Tanoh',
       'contact': '07 08 09 10 11',
-      'address': 'Akoupé Marché',
+      'address': 'Korhogo Marché',
       'details': '20 plateaux Gros format',
       'amount': 44000,
       'paid': 25500,
@@ -130,7 +130,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       'status': 'Échéance 28/08',
       'isOverdue': false,
       'phone': '07 08 09 10 11',
-      'address': 'Akoupé Marché',
+      'address': 'Korhogo Marché',
     },
   ];
 
@@ -173,7 +173,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
         forceRefresh: forceRefresh,
         useCache: true,
       );
-      if (mounted && salesRes is List && salesRes.isNotEmpty) {
+      if (mounted && salesRes is List) {
         _salesHistory = salesRes.map<Map<String, dynamic>>((s) {
           DateTime date;
           try {
@@ -243,7 +243,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
         forceRefresh: forceRefresh,
         useCache: true,
       );
-      if (mounted && debtorsRes is List && debtorsRes.isNotEmpty) {
+      if (mounted && debtorsRes is List) {
         _debtors = debtorsRes.map<Map<String, dynamic>>((d) {
           return {
             'client_id':
@@ -267,7 +267,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
         forceRefresh: forceRefresh,
         useCache: true,
       );
-      if (mounted && clientsRes is List && clientsRes.isNotEmpty) {
+      if (mounted && clientsRes is List) {
         _clientsList = clientsRes.map<Map<String, dynamic>>((c) {
           return {
             'id': c['id']?.toString() ?? '',
@@ -1249,7 +1249,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                           ),
                         ),
                       );
-                      _loadAllData();
+                      _loadAllData(forceRefresh: true);
                     }
                   },
                   child: const Text('Enregistrer'),
@@ -1364,7 +1364,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             const SizedBox(height: 10),
             AppInputBox(
               label: 'Adresse / Point de livraison',
-              placeholder: 'Ex : Marché d\'Akoupé',
+              placeholder: 'Ex : Marché d\'Korhogo',
               controller: _clientAddressController,
             ),
             const SizedBox(height: 16),
@@ -1683,7 +1683,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                             ),
                           );
                         }
-                        _loadAllData();
+                        _loadAllData(forceRefresh: true);
                       },
                 child: const Text('Valider la vente'),
               ),

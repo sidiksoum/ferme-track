@@ -32,7 +32,10 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
     // Écoute temps réel Socket.IO pour actualisation en arrière-plan
     _socketSubscription = _socketService.allEvents.listen((event) {
       final evt = event['event']?.toString() ?? '';
-      if (evt.contains('task') || evt.contains('activit') || evt.contains('order') || evt.contains('anomal')) {
+      if (evt.contains('task') ||
+          evt.contains('activit') ||
+          evt.contains('order') ||
+          evt.contains('anomal')) {
         if (mounted) {
           _loadActivities(forceRefresh: true);
         }
@@ -62,7 +65,7 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
         _activities =
             response.whereType<Map>().map((raw) {
               final item = Map<String, dynamic>.from(raw);
-              final status = item['status']?.toString()?.toLowerCase();
+              final status = item['status']?.toString().toLowerCase();
               return {
                 ...item,
                 'status': (status == 'done' || status == 'completed')
@@ -164,14 +167,39 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
                   () => setState(() => _activitiesBuildingFilter = 'A'),
                 ),
                 _buildFilterChip(
+                  'Bât. A1',
+                  _activitiesBuildingFilter == 'A1',
+                  () => setState(() => _activitiesBuildingFilter = 'A1'),
+                ),
+                _buildFilterChip(
                   'Bât. B',
                   _activitiesBuildingFilter == 'B',
                   () => setState(() => _activitiesBuildingFilter = 'B'),
                 ),
                 _buildFilterChip(
+                  'Bât. B1',
+                  _activitiesBuildingFilter == 'B1',
+                  () => setState(() => _activitiesBuildingFilter = 'B1'),
+                ),
+                _buildFilterChip(
                   'Bât. C',
                   _activitiesBuildingFilter == 'C',
                   () => setState(() => _activitiesBuildingFilter = 'C'),
+                ),
+                _buildFilterChip(
+                  'Bât. D',
+                  _activitiesBuildingFilter == 'D',
+                  () => setState(() => _activitiesBuildingFilter = 'D'),
+                ),
+                _buildFilterChip(
+                  'Bât. E',
+                  _activitiesBuildingFilter == 'E',
+                  () => setState(() => _activitiesBuildingFilter = 'E'),
+                ),
+                _buildFilterChip(
+                  'Bât. F',
+                  _activitiesBuildingFilter == 'F',
+                  () => setState(() => _activitiesBuildingFilter = 'F'),
                 ),
               ],
             ),
@@ -204,7 +232,9 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
                         itemBuilder: (context, index) {
                           final act = filtered[index];
                           IconData icon = Icons.task_alt;
-                          if (act['title'].toString().contains('Alimentation')) {
+                          if (act['title'].toString().contains(
+                            'Alimentation',
+                          )) {
                             icon = Icons.restaurant;
                           } else if (act['title'].toString().contains(
                             'Ramassage',
@@ -301,7 +331,9 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
         if (decoded is Map) {
           final lines = <String>[];
           if (decoded['feedQtyKg'] != null)
-            lines.add('Quantité d\'aliment distribué : ${decoded['feedQtyKg']} kg');
+            lines.add(
+              'Quantité d\'aliment distribué : ${decoded['feedQtyKg']} kg',
+            );
           if (decoded['dose'] != null)
             lines.add('Quantité dose utilisée : ${decoded['dose']}');
           if (decoded['weight'] != null)

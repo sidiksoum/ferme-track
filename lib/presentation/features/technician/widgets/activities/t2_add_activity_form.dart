@@ -485,23 +485,28 @@ class _T2AddActivityFormState extends State<T2AddActivityForm> {
 
   String _taskTypeFor(String activity) {
     final value = activity.toLowerCase();
-    if (value.contains('vaccin')) return 'vaccination';
-    if (value.contains('aliment') || value.contains('abrevage')) return 'feeding';
-    if (value.contains('netoy') || value.contains('nettoy')) return 'cleaning';
-    if (value.contains('œuf') || value.contains('oeuf')) return 'egg_collection';
-    if (value.contains('pese')) return 'inspection';
+    if (value.contains('vaccin')) return 'VACCINATION';
+    if (value.contains('aliment') || value.contains('abrevage') || value.contains('abreuv')) return 'FEEDING';
+    if (value.contains('netoy') || value.contains('nettoy')) return 'CLEANING';
+    if (value.contains('œuf') || value.contains('oeuf') || value.contains('ramassage') || value.contains('ponte')) return 'EGG_COLLECTION';
+    if (value.contains('pese') || value.contains('pesée')) return 'INSPECTION';
+    if (value.contains('mortalit')) return 'MORTALITY';
     if (value.contains('vitamine') ||
         value.contains('deparasitant') ||
-        value.contains('injection')) {
-      return 'treatment';
+        value.contains('déparasitant') ||
+        value.contains('injection') ||
+        value.contains('soin') ||
+        value.contains('traitement')) {
+      return 'TREATMENT';
     }
-    return 'other';
+    return 'OTHER';
   }
 
   String _priorityFor(int priority) {
-    if (priority >= 3) return 'high';
-    if (priority <= 1) return 'low';
-    return 'normal';
+    if (priority >= 4) return 'URGENT';
+    if (priority >= 3) return 'HIGH';
+    if (priority <= 1) return 'LOW';
+    return 'NORMAL';
   }
 
   String _timeForApi(DateTime value) =>

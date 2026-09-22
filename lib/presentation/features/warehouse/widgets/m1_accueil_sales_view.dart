@@ -52,7 +52,7 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
     {
       'client': 'Adjoua Tanoh',
       'contact': '07 08 09 10 11',
-      'address': 'Akoupé Marché',
+      'address': 'Ferme Soro',
       'saleDetails': '20 plateaux Gros format',
       'total': 44000,
       'paid': 25500,
@@ -81,9 +81,11 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
     // Écoute temps réel Socket.IO pour rafraîchissement instantané
     _socketSubscription = _socketService.allEvents.listen((event) {
       final eventName = event['event']?.toString() ?? '';
-      if (eventName == 'sale:created' ||
-          eventName == 'stock:updated' ||
-          eventName.contains('reception')) {
+      if (eventName.contains('sale') ||
+          eventName.contains('stock') ||
+          eventName.contains('reception') ||
+          eventName.contains('egg') ||
+          eventName.contains('order')) {
         if (mounted) {
           _loadDashboardData(forceRefresh: true);
         }
@@ -182,8 +184,13 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
       if (mounted && response is List && response.isNotEmpty) {
         setState(() {
           _receivables = response.map<Map<String, dynamic>>((r) {
-            final due = (r['due'] as num?)?.toInt() ?? (r['balance'] as num?)?.toInt() ?? 0;
-            final isOverdue = r['isOverdue'] == true || (r['status']?.toString().contains('dépassée') ?? false);
+            final due =
+                (r['due'] as num?)?.toInt() ??
+                (r['balance'] as num?)?.toInt() ??
+                0;
+            final isOverdue =
+                r['isOverdue'] == true ||
+                (r['status']?.toString().contains('dépassée') ?? false);
             return {
               'client': r['name']?.toString() ?? 'Client',
               'contact': r['phone']?.toString() ?? '—',
@@ -211,7 +218,7 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
           color: AppColors.primaryLight.withOpacity(0.3),
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
           child: Text(
-            'Bonjour, ${widget.userName}  ·  Ferme Akoupé  ·  3 bâtiments actifs',
+            'Bonjour, ${widget.userName}  ·  Ferme Soro  ·  8 bâtiments actifs',
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -235,14 +242,20 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
                   child: _buildSubTabButton(
                     'Ventes & Créances',
                     _toggleMode == 'sales',
-                    () => setState(() => _toggleMode = 'sales'),
+                    () {
+                      setState(() => _toggleMode = 'sales');
+                      _loadDashboardData(forceRefresh: true);
+                    },
                   ),
                 ),
                 Expanded(
                   child: _buildSubTabButton(
                     'Suivi des Stocks',
                     _toggleMode == 'stock',
-                    () => setState(() => _toggleMode = 'stock'),
+                    () {
+                      setState(() => _toggleMode = 'stock');
+                      _loadEggStocks(forceRefresh: true);
+                    },
                   ),
                 ),
               ],
@@ -299,7 +312,9 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
               ),
               const SizedBox(height: 2),
               Text(
-                _periodFilter == 'today' ? '$todaySales FCFA' : '$totalSales FCFA',
+                _periodFilter == 'today'
+                    ? '$todaySales FCFA'
+                    : '$totalSales FCFA',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -324,8 +339,14 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('PLUS GROSSES CRÉANCES', style: AppTypography.labelSmall),
-            Text('${_receivables.length} clients', style: const TextStyle(fontSize: 11, color: AppColors.inkSoft)),
+            const Text(
+              'PLUS GROSSES CRÉANCES',
+              style: AppTypography.labelSmall,
+            ),
+            Text(
+              '${_receivables.length} clients',
+              style: const TextStyle(fontSize: 11, color: AppColors.inkSoft),
+            ),
           ],
         ),
         const SizedBox(height: 9),

@@ -83,7 +83,14 @@ class _V1TasksViewState extends State<V1TasksView> {
       if (!mounted || response is! List) return;
       final parsedTasks = response.whereType<Map>().map((rawItem) {
         final item = Map<String, dynamic>.from(rawItem);
-        final status = item['status']?.toString();
+        final status = (item['status']?.toString() ?? '').toLowerCase().trim();
+        final isDone = status == 'done' || status == 'completed';
+        final isPendingValidation = status == 'pending_validation' ||
+            status == 'pendingvalidation' ||
+            status == 'pending_approval';
+        final isLate = status == 'late';
+        final isInProgress = status == 'in_progress' || status == 'inprogress';
+
         return {
           ...item,
           'title': item['title']?.toString() ?? 'Tâche',
@@ -91,8 +98,9 @@ class _V1TasksViewState extends State<V1TasksView> {
           'buildingName':
               item['buildingName']?.toString() ?? 'Bâtiment non renseigné',
           'responsibleName':
-              item['responsibleName']?.toString() ??
-              'Responsable non renseigné',
+              (item['responsibleName'] != null && item['responsibleName'].toString().trim().isNotEmpty)
+                  ? item['responsibleName'].toString()
+                  : 'Responsable',
           'taskType': item['taskType']?.toString() ?? 'other',
           'description': item['description']?.toString(),
           'scheduledDate': item['scheduledDate']?.toString(),
@@ -102,11 +110,15 @@ class _V1TasksViewState extends State<V1TasksView> {
           'completedAt': item['completedAt']?.toString(),
           'submittedNotes': item['submittedNotes']?.toString(),
           'validationNotes': item['validationNotes']?.toString(),
-          'status': status == 'done'
+          'status': isDone
               ? TaskStatus.done
-              : status == 'pending_validation'
+              : isPendingValidation
               ? TaskStatus.pendingValidation
-              : TaskStatus.inProgress,
+              : isLate
+              ? TaskStatus.late
+              : isInProgress
+              ? TaskStatus.inProgress
+              : TaskStatus.todo,
           'icon': _iconFor(item['taskType']?.toString()),
         };
       }).toList();
@@ -272,16 +284,15 @@ class _V1TasksViewState extends State<V1TasksView> {
                   meta:
                       '${task['buildingName']} · ${task['responsibleName']} · ${task['scheduledDate']?.toString().split('T').first ?? ''} · ${task['meta']} - ${task['endTime'] ?? ''}',
                   status: task['status'] as TaskStatus,
-                  onTap: task['status'] != TaskStatus.done
-                      ? () async {
-                          final closed = await widget.onSelectTask(task);
-                          if (closed && mounted) {
-                            setState(
-                              () => task['status'] = TaskStatus.pendingValidation,
-                            );
-                          }
-                        }
-                      : null,
+                  onTap: () async {
+                    final closed = await widget.onSelectTask(task);
+                    if (closed && mounted) {
+                      setState(
+                        () => task['status'] = TaskStatus.pendingValidation,
+                      );
+                      _loadTasks(forceRefresh: true);
+                    }
+                  },
                 );
               },
             ),

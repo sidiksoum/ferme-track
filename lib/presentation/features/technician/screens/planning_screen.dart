@@ -117,14 +117,25 @@ class _PlanningScreenState extends State<PlanningScreen> {
               final shouldLogout = await showLogoutConfirmationDialog(context);
               if (!shouldLogout || !mounted) return;
 
-              showActionLoadingDialog(context, message: 'Déconnexion en cours...');
+              showActionLoadingDialog(
+                context,
+                message: 'Déconnexion en cours...',
+              );
               final success = await authNotifier.logout();
               if (!mounted) return;
               Navigator.of(context, rootNavigator: true).pop();
 
-              if (!success && authNotifier.error != null) {
+              if (success) {
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              } else if (authNotifier.error != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(authNotifier.error ?? 'Déconnexion impossible.')),
+                  SnackBar(
+                    content: Text(
+                      authNotifier.error ?? 'Déconnexion impossible.',
+                    ),
+                  ),
                 );
               }
             },
@@ -178,7 +189,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
   String _getAppBarSubtitle() {
     switch (_selectedNavIndex) {
       case 0:
-        return 'Ferme Akoupé · Suivi technique';
+        return 'Ferme Soro · Suivi technique';
       case 1:
         return 'Gestion des tâches quotidiennes';
       case 2:
@@ -188,7 +199,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
       case 4:
         return 'Bâtiments, lots et affectation';
       default:
-        return 'Ferme Akoupé';
+        return 'Ferme Soro';
     }
   }
 

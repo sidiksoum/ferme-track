@@ -35,7 +35,8 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
         leading: _isShowingNotifications
             ? IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => setState(() => _isShowingNotifications = false),
+                onPressed: () =>
+                    setState(() => _isShowingNotifications = false),
               )
             : null,
         title: _isShowingNotifications
@@ -56,7 +57,7 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
                 children: [
                   Text('Bonjour, $userName'),
                   const Text(
-                    'Ferme Akoupé · 6 bâtiments actifs',
+                    'Ferme Soro · 8 bâtiments actifs',
                     style: AppTypography.appbarSubtitle,
                   ),
                 ],
@@ -116,13 +117,24 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
             onPressed: () {
               showLogoutConfirmationDialog(context, () async {
                 if (!mounted) return;
-                showActionLoadingDialog(context, message: 'Déconnexion en cours...');
+                showActionLoadingDialog(
+                  context,
+                  message: 'Déconnexion en cours...',
+                );
                 final success = await authNotifier.logout();
                 if (!mounted) return;
                 Navigator.of(context, rootNavigator: true).pop();
-                if (!success && authNotifier.error != null) {
+                if (success) {
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/login', (route) => false);
+                } else if (authNotifier.error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(authNotifier.error ?? 'Déconnexion impossible.')),
+                    SnackBar(
+                      content: Text(
+                        authNotifier.error ?? 'Déconnexion impossible.',
+                      ),
+                    ),
                   );
                 }
               });

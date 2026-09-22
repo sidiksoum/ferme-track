@@ -163,7 +163,9 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                 final success = await authNotifier.logout();
                 if (!mounted) return;
                 Navigator.of(context, rootNavigator: true).pop();
-                if (!success && authNotifier.error != null) {
+                if (success) {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                } else if (authNotifier.error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -259,6 +261,35 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
     );
   }
 
+  String _formatAnomalyDate(dynamic value) {
+    if (value == null) return '';
+    DateTime? dt;
+    if (value is DateTime) {
+      dt = value;
+    } else if (value is String) {
+      dt = DateTime.tryParse(value);
+    }
+    if (dt == null) return value.toString();
+    final localDt = dt.toLocal();
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final targetStart = DateTime(localDt.year, localDt.month, localDt.day);
+    final diffDays = todayStart.difference(targetStart).inDays;
+
+    final timeStr = '${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')}';
+    if (diffDays == 0) {
+      return 'Aujourd\'hui à $timeStr';
+    } else if (diffDays == 1) {
+      return 'Hier à $timeStr';
+    }
+    final months = [
+      'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+      'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'
+    ];
+    final monthStr = months[localDt.month - 1];
+    return '${localDt.day} $monthStr ${localDt.year} à $timeStr';
+  }
+
   Widget _buildAnomaliesHistory() {
     return RefreshIndicator(
       onRefresh: () => _loadAnomaliesHistory(forceRefresh: true),
@@ -283,6 +314,13 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                   itemCount: _reportedAnomalies.length,
                   itemBuilder: (context, index) {
                     final item = _reportedAnomalies[index];
+                    final dateFormatted = _formatAnomalyDate(item['date'] ?? item['created_at']);
+                    final building = item['buildingName'] ?? item['building'] ?? 'Bâtiment';
+                    final cause = item['cause'] != null && item['cause'].toString().isNotEmpty
+                        ? ' · ${item['cause']}'
+                        : '';
+                    final details = item['meta']?.toString() ?? '$building$cause';
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
@@ -306,10 +344,14 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                                       style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 8),
-                                    Text('Date : ${item['date'] ?? ''}'),
+                                    Text('Date : $dateFormatted'),
                                     const SizedBox(height: 8),
-                                    Text('Détails : ${item['meta'] ?? ''}'),
-                                    if (item['comment'] != null &&
+                                    Text('Détails : $details'),
+                                    if (item['description'] != null &&
+                                        item['description'].toString().trim().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text('Notes : ${item['description']}'),
+                                    ] else if (item['comment'] != null &&
                                         item['comment'].toString().trim().isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       Text('Notes : ${item['comment']}'),
@@ -357,7 +399,7 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                                       ),
                                     ),
                                     Text(
-                                      item['meta'] as String? ?? '',
+                                      details,
                                       style: const TextStyle(
                                         color: AppColors.inkSoft,
                                         fontSize: 11.5,
@@ -367,9 +409,10 @@ class _PoltrykeeperTasksScreenState extends State<PoltrykeeperTasksScreen> {
                                 ),
                               ),
                               Text(
-                                item['date'] as String? ?? '',
+                                dateFormatted,
                                 style: const TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w500,
                                   color: AppColors.inkSoft,
                                 ),
                               ),

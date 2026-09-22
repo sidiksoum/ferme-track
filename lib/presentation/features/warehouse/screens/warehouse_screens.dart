@@ -100,7 +100,9 @@ class _SalesScreenState extends State<SalesScreen> {
                 final success = await authNotifier.logout();
                 if (!mounted) return;
                 Navigator.of(context, rootNavigator: true).pop();
-                if (!success && authNotifier.error != null) {
+                if (success) {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                } else if (authNotifier.error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(

@@ -129,12 +129,19 @@ class _T2OrdersTabState extends State<T2OrdersTab> {
         const Text('COMMANDES FOURNISSEURS', style: AppTypography.labelSmall),
         const SizedBox(height: 10),
         ...widget.orders.map((ord) {
-          final statusStr = (ord['status']?.toString() ?? '').toLowerCase();
-          final isDelivered = statusStr.contains('livr') ||
+          final statusStr = (ord['status']?.toString() ?? '').toLowerCase().trim();
+          final hasReceivedData = (ord['receivedDate'] != null && ord['receivedDate'].toString().isNotEmpty) ||
+              (ord['qtyReceived'] != null && ord['qtyReceived'].toString().isNotEmpty);
+          final isDelivered = hasReceivedData ||
+              statusStr.contains('livr') ||
               statusStr.contains('fait') ||
               statusStr.contains('received') ||
-              statusStr.contains('clotur');
-          final isLate = ord['isLate'] == true;
+              statusStr.contains('clotur') ||
+              statusStr.contains('recu') ||
+              statusStr.contains('reçu') ||
+              statusStr.contains('termin') ||
+              statusStr.contains('compl');
+          final isLate = ord['isLate'] == true && !isDelivered;
           final status = isDelivered
               ? TaskStatus.done
               : (isLate ? TaskStatus.late : TaskStatus.todo);
@@ -160,7 +167,10 @@ class _T2OrdersTabState extends State<T2OrdersTab> {
                   order: ord,
                   buildingOptions: widget.buildingOptions,
                   onOrderClosed: () {
-                    ord['status'] = 'Livrée';
+                    setState(() {
+                      ord['status'] = 'Livrée';
+                      ord['receivedDate'] = DateTime.now().toIso8601String();
+                    });
                     widget.onRefreshOrders();
                   },
                 );

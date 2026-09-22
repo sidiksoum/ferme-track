@@ -113,7 +113,7 @@ class _M4ClientsListViewState extends State<M4ClientsListView> {
         forceRefresh: forceRefresh,
         useCache: true,
       );
-      if (mounted && response is List && response.isNotEmpty) {
+      if (mounted && response is List) {
         setState(() {
           _clientsList = response.map<Map<String, dynamic>>((c) {
             return {
@@ -184,7 +184,7 @@ class _M4ClientsListViewState extends State<M4ClientsListView> {
 
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _loadClients,
+              onRefresh: () => _loadClients(forceRefresh: true),
               child: filtered.isEmpty
                   ? const Center(
                       child: Text(
@@ -446,7 +446,7 @@ class _M4ClientsListViewState extends State<M4ClientsListView> {
                           ),
                         ),
                       );
-                      _loadClients();
+                      _loadClients(forceRefresh: true);
                     }
                   },
                   child: const Text('Enregistrer'),

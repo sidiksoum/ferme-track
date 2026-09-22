@@ -392,6 +392,7 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
       await _apiClient.post(
         '/activities/$id/confirm',
         queryParameters: {'comment': comment},
+        data: {'comment': comment},
       );
       widget.onRefresh();
       if (mounted) {

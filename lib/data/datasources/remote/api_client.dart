@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 
 import '../../../../config/constants/app_constants.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../core/exceptions/app_exceptions.dart';
+import '../../../../core/services/socket_client_service.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../local/cache_manager.dart';
 
@@ -140,6 +142,8 @@ class ApiClient {
       if (lower.contains('stock')) {
         await _cacheManager.invalidatePrefix('/stocks');
         await _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
+        await _cacheManager.invalidatePrefix('/technician/stocks');
+        await _cacheManager.invalidatePrefix('/dashboard');
       }
       if (lower.contains('sale') || lower.contains('client') || lower.contains('caisse') || lower.contains('refund') || lower.contains('payment') || lower.contains('debtor')) {
         await _cacheManager.invalidatePrefix('/commercial/sales');
@@ -148,15 +152,25 @@ class ApiClient {
         await _cacheManager.invalidatePrefix('/magasinier/caisse');
         await _cacheManager.invalidatePrefix('/magasinier/egg-stocks');
         await _cacheManager.invalidatePrefix('/stocks');
+        await _cacheManager.invalidatePrefix('/dashboard');
       }
       if (lower.contains('building') || lower.contains('batch')) {
         await _cacheManager.invalidatePrefix('/buildings');
         await _cacheManager.invalidatePrefix('/batches');
+        await _cacheManager.invalidatePrefix('/technician/buildings');
       }
-      if (lower.contains('anomal')) {
+      if (lower.contains('anomal') || lower.contains('mortalit')) {
+        await _cacheManager.invalidatePrefix('/volailler/anomalies');
         await _cacheManager.invalidatePrefix('/anomalies');
         await _cacheManager.invalidatePrefix('/activities');
+        await _cacheManager.invalidatePrefix('/dashboard');
       }
+
+      try {
+        if (getIt.isRegistered<SocketClientService>()) {
+          getIt<SocketClientService>().emitLocalEvent(endpoint);
+        }
+      } catch (_) {}
     } catch (_) {}
   }
 
