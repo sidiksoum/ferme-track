@@ -86,12 +86,20 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
     ]);
   }
 
-  Future<void> _loadFormOptions(String farmId) async {
+  Future<void> _loadFormOptions(String farmId, {bool forceRefresh = false}) async {
     if (!mounted) return;
+    if (_buildingOptions.isNotEmpty && !forceRefresh) {
+      return;
+    }
     setState(() => _isLoadingOptions = true);
     try {
       final responses = await Future.wait([
-        _apiClient.get('/buildings', queryParameters: {'farm_id': farmId}),
+        _apiClient.get(
+          '/buildings',
+          queryParameters: {'farm_id': farmId},
+          forceRefresh: forceRefresh,
+          useCache: true,
+        ),
         _apiClient.get('/technician/volaillers'),
         _apiClient.get('/technician/staff'),
         _apiClient.get('/suppliers'),
@@ -352,8 +360,15 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
       children: [
         T2ActivitiesTab(
           activities: _activities,
+          buildingOptions: _buildingOptions,
           isLoading: _isLoadingActivities,
-          onRefresh: () => _loadActivities(),
+          onRefresh: () {
+            final farmId = context.read<AuthNotifier>().currentUser?.farmId;
+            if (farmId != null && farmId.isNotEmpty) {
+              _loadFormOptions(farmId);
+            }
+            _loadActivities(forceRefresh: true);
+          },
         ),
 
         // Sticky Bottom action buttons

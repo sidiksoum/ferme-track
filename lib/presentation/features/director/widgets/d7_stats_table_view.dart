@@ -18,8 +18,10 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
   StreamSubscription? _socketSubscription;
 
   String _periodFilter = '7j'; // today, 7j, 30j, custom
+  String _buildingFilter = 'Tous';
   DateTimeRange? _selectedDateRange;
 
+  List<Map<String, dynamic>> _buildingOptions = [];
   List<Map<String, dynamic>> _buildingsData = [];
   List<Map<String, dynamic>> _layingChartData = [];
   Map<String, dynamic> _statsSummary = {
@@ -32,6 +34,7 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
   @override
   void initState() {
     super.initState();
+    _loadBuildingOptions();
     _loadStatsData();
 
     _socketSubscription = _socketService.allEvents.listen((event) {
@@ -55,11 +58,26 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
     super.dispose();
   }
 
+  Future<void> _loadBuildingOptions() async {
+    if (!mounted) return;
+    try {
+      final response = await _apiClient.get('/buildings', useCache: true);
+      if (!mounted || response is! List) return;
+      setState(() {
+        _buildingOptions = response.whereType<Map>().map((item) => {
+          'id': item['id']?.toString() ?? '',
+          'name': item['name']?.toString() ?? 'Bâtiment',
+        }).toList();
+      });
+    } catch (_) {}
+  }
+
   Future<void> _loadStatsData({bool forceRefresh = false}) async {
     if (!mounted) return;
     try {
       final queryParams = <String, dynamic>{
         'period': _periodFilter,
+        if (_buildingFilter != 'Tous') 'buildingId': _buildingFilter,
       };
       if (_periodFilter == 'custom' && _selectedDateRange != null) {
         queryParams['start_date'] = _selectedDateRange!.start.toIso8601String();
@@ -118,8 +136,36 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
     }
   }
 
+  String _normalizeBuildingValue(String? value) {
+    if (value == null) return '';
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  bool _matchesBuildingFilter(Map<String, dynamic> building) {
+    if (_buildingFilter == 'Tous') return true;
+
+    final filterKey = _normalizeBuildingValue(_buildingFilter);
+    if (filterKey.isEmpty) return false;
+
+    final candidates = [
+      building['id']?.toString(),
+      building['buildingId']?.toString(),
+      building['buildingName']?.toString(),
+      building['name']?.toString(),
+    ];
+
+    return candidates.any((value) {
+      final normalized = _normalizeBuildingValue(value);
+      return normalized == filterKey ||
+          normalized.contains(filterKey) ||
+          filterKey.contains(normalized);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filteredBuildings = _buildingsData.where(_matchesBuildingFilter).toList();
+
     return RefreshIndicator(
       onRefresh: () => _loadStatsData(forceRefresh: true),
       child: SingleChildScrollView(
@@ -190,6 +236,48 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
               ),
             ],
             const SizedBox(height: 16),
+            const Text('FILTRER PAR BÂTIMENT', style: AppTypography.labelSmall),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip(
+                    'Tous',
+                    _buildingFilter == 'Tous',
+                    () {
+                      setState(() => _buildingFilter = 'Tous');
+                      _loadStatsData(forceRefresh: true);
+                    },
+                  ),
+                  if (_buildingOptions.isNotEmpty)
+                    ..._buildingOptions.map((option) {
+                      final label = option['name']?.toString() ?? 'Bâtiment';
+                      final value = option['id']?.toString() ?? label;
+                      return _buildFilterChip(
+                        label,
+                        _buildingFilter == value,
+                        () {
+                          setState(() => _buildingFilter = value);
+                          _loadStatsData(forceRefresh: true);
+                        },
+                      );
+                    })
+                  else
+                    ...[
+                      _buildFilterChip(
+                        'Bâtiment',
+                        _buildingFilter == 'Bâtiment',
+                        () {
+                          setState(() => _buildingFilter = 'Bâtiment');
+                          _loadStatsData(forceRefresh: true);
+                        },
+                      ),
+                    ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             const Text(
               'TABLEAU COMPARATIF DES BÂTIMENTS',
@@ -224,7 +312,7 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
                     // Table Header
                     _buildHeaderRow(),
                     // Dynamic Data Rows
-                    if (_buildingsData.isEmpty)
+                    if (filteredBuildings.isEmpty)
                       const TableRow(
                         children: [
                           Padding(
@@ -247,7 +335,7 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
                         ],
                       )
                     else
-                      ..._buildingsData.map((b) {
+                      ...filteredBuildings.map((b) {
                         final status = b['status']?.toString() ?? 'Stable';
                         final hexColor = b['statusColorHex']?.toString();
                         final statusColor = _getStatusColor(status, hexColor);
@@ -554,6 +642,31 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.inkSoft,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryDark : AppColors.paper,
+          border: Border.all(
+            color: isSelected ? AppColors.primaryDark : AppColors.line,
+          ),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w500,
             color: isSelected ? Colors.white : AppColors.inkSoft,
           ),
         ),

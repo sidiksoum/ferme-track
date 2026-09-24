@@ -149,6 +149,15 @@ class SocketClientService extends ChangeNotifier {
     });
 
     // Événement : Nouvelle tâche créée par le technicien
+    _socket!.on('notification:new', (data) {
+      AppLogger.info('⚡ Événement reçu [notification:new]: $data');
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        _allEventsController.add({'event': 'notification:new', 'data': map});
+        notifyListeners();
+      }
+    });
+
     _socket!.on('task:created', (data) {
       AppLogger.info('⚡ Événement reçu [task:created]: $data');
       _cacheManager.invalidatePrefix('/volailler/tasks');

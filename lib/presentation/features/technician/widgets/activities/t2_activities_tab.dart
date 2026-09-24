@@ -7,12 +7,14 @@ import '../../../../shared/widgets/common_widgets.dart';
 
 class T2ActivitiesTab extends StatefulWidget {
   final List<Map<String, dynamic>> activities;
+  final List<Map<String, String>> buildingOptions;
   final bool isLoading;
   final VoidCallback onRefresh;
 
   const T2ActivitiesTab({
     super.key,
     required this.activities,
+    required this.buildingOptions,
     required this.isLoading,
     required this.onRefresh,
   });
@@ -26,11 +28,61 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
   String _activitiesTab = 'in_progress'; // in_progress, pending_validation, done
   String _selectedBuildingFilter = 'all'; // all, A, A1, B, B1, C, D, E, F
 
+  String _normalizeBuildingValue(String? value) {
+    if (value == null) return '';
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  bool _matchesBuildingFilter(Map<String, dynamic> act) {
+    if (_selectedBuildingFilter == 'all') return true;
+
+    final filterKey = _normalizeBuildingValue(_selectedBuildingFilter);
+    if (filterKey.isEmpty) return false;
+
+    final buildingValues = [
+      act['building'],
+      act['buildingName'],
+      act['building_id'],
+      act['idBuilding'],
+      act['buildingId'],
+      act['building_name'],
+    ].whereType<String>().toList();
+
+    final matches = buildingValues.any((value) {
+      final normalizedValue = _normalizeBuildingValue(value);
+      return normalizedValue == filterKey ||
+          normalizedValue.contains(filterKey) ||
+          filterKey.contains(normalizedValue);
+    });
+
+    if (matches) return true;
+
+    final buildingOption = widget.buildingOptions.firstWhere(
+      (option) =>
+          _normalizeBuildingValue(option['id']) == filterKey ||
+          _normalizeBuildingValue(option['name']) == filterKey ||
+          _normalizeBuildingValue(option['id']).contains(filterKey) ||
+          _normalizeBuildingValue(option['name']).contains(filterKey),
+      orElse: () => <String, String>{},
+    );
+
+    if (buildingOption.isEmpty) return false;
+
+    final optionId = _normalizeBuildingValue(buildingOption['id']);
+    final optionName = _normalizeBuildingValue(buildingOption['name']);
+    return buildingValues.any((value) {
+      final normalizedValue = _normalizeBuildingValue(value);
+      return normalizedValue == optionId ||
+          normalizedValue == optionName ||
+          normalizedValue.contains(optionId) ||
+          normalizedValue.contains(optionName);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredActivities = widget.activities.where((act) {
-      if (_selectedBuildingFilter != 'all' &&
-          act['building'] != _selectedBuildingFilter) {
+      if (!_matchesBuildingFilter(act)) {
         return false;
       }
       if (_activitiesTab == 'pending_validation') {
@@ -101,46 +153,26 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
                   _selectedBuildingFilter == 'all',
                   () => setState(() => _selectedBuildingFilter = 'all'),
                 ),
-                _buildFilterChip(
-                  'Bât. A',
-                  _selectedBuildingFilter == 'A',
-                  () => setState(() => _selectedBuildingFilter = 'A'),
-                ),
-                _buildFilterChip(
-                  'Bât. A1',
-                  _selectedBuildingFilter == 'A1',
-                  () => setState(() => _selectedBuildingFilter = 'A1'),
-                ),
-                _buildFilterChip(
-                  'Bât. B',
-                  _selectedBuildingFilter == 'B',
-                  () => setState(() => _selectedBuildingFilter = 'B'),
-                ),
-                _buildFilterChip(
-                  'Bât. B1',
-                  _selectedBuildingFilter == 'B1',
-                  () => setState(() => _selectedBuildingFilter = 'B1'),
-                ),
-                _buildFilterChip(
-                  'Bât. C',
-                  _selectedBuildingFilter == 'C',
-                  () => setState(() => _selectedBuildingFilter = 'C'),
-                ),
-                _buildFilterChip(
-                  'Bât. D',
-                  _selectedBuildingFilter == 'D',
-                  () => setState(() => _selectedBuildingFilter = 'D'),
-                ),
-                _buildFilterChip(
-                  'Bât. E',
-                  _selectedBuildingFilter == 'E',
-                  () => setState(() => _selectedBuildingFilter = 'E'),
-                ),
-                _buildFilterChip(
-                  'Bât. F',
-                  _selectedBuildingFilter == 'F',
-                  () => setState(() => _selectedBuildingFilter = 'F'),
-                ),
+                if (widget.buildingOptions.isNotEmpty)
+                  ...widget.buildingOptions.map((option) {
+                    final label = option['name']?.trim().isNotEmpty == true
+                        ? option['name']!
+                        : 'Bâtiment';
+                    final value = option['id'] ?? option['name'] ?? 'all';
+                    return _buildFilterChip(
+                      label,
+                      _selectedBuildingFilter == value,
+                      () => setState(() => _selectedBuildingFilter = value),
+                    );
+                  })
+                else
+                  ...[
+                    _buildFilterChip(
+                      'Bât. A',
+                      _selectedBuildingFilter == 'A',
+                      () => setState(() => _selectedBuildingFilter = 'A'),
+                    ),
+                  ],
               ],
             ),
           ),

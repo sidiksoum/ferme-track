@@ -197,6 +197,7 @@ class __AppHomeRouterState extends State<_AppHomeRouter> {
                 farmId: farmId,
               );
               getIt<SystemNotificationService>().setUserRole(role);
+              getIt<SystemNotificationService>().fetchNotifications(forceRefresh: true);
               getIt<SystemNotificationService>().requestPermissions();
             });
           }

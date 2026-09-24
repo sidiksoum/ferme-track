@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../config/theme/app_theme.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/socket_client_service.dart';
 import '../../../../data/datasources/remote/api_client.dart';
-import '../../../../config/theme/app_theme.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../shared/widgets/common_widgets.dart';
 
 class D3ActivitiesView extends StatefulWidget {
@@ -20,6 +22,7 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
   StreamSubscription? _socketSubscription;
 
   List<Map<String, dynamic>> _activities = [];
+  List<Map<String, String>> _buildingOptions = [];
   bool _isLoading = false;
   String _activitiesBuildingFilter = 'all'; // all, A, B, C
   String _activitiesTab = 'planned'; // planned, done
@@ -27,6 +30,7 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
   @override
   void initState() {
     super.initState();
+    _loadBuildings();
     _loadActivities();
 
     // Écoute temps réel Socket.IO pour actualisation en arrière-plan
@@ -47,6 +51,33 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
   void dispose() {
     _socketSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadBuildings({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    if (_buildingOptions.isNotEmpty && !forceRefresh) {
+      return;
+    }
+    try {
+      final farmId = context.read<AuthNotifier>().currentUser?.farmId;
+      if (farmId == null || farmId.isEmpty) return;
+
+      final response = await _apiClient.get(
+        '/buildings',
+        queryParameters: {'farm_id': farmId},
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+
+      if (!mounted || response is! List) return;
+
+      setState(() {
+        _buildingOptions = response.whereType<Map>().map((item) => {
+          'id': item['id']?.toString() ?? '',
+          'name': item['name']?.toString() ?? 'Bâtiment',
+        }).toList();
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadActivities({bool forceRefresh = false}) async {
@@ -99,12 +130,62 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
     }
   }
 
+  String _normalizeBuildingValue(String? value) {
+    if (value == null) return '';
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  bool _matchesBuildingFilter(Map<String, dynamic> act) {
+    if (_activitiesBuildingFilter == 'all') return true;
+
+    final filterKey = _normalizeBuildingValue(_activitiesBuildingFilter);
+    if (filterKey.isEmpty) return false;
+
+    final buildingValues = [
+      act['building'],
+      act['buildingName'],
+      act['building_id'],
+      act['idBuilding'],
+      act['buildingId'],
+      act['building_name'],
+    ].whereType<String>().toList();
+
+    final matches = buildingValues.any((value) {
+      final normalizedValue = _normalizeBuildingValue(value);
+      return normalizedValue == filterKey ||
+          normalizedValue.contains(filterKey) ||
+          filterKey.contains(normalizedValue);
+    });
+
+    if (matches) return true;
+
+    final option = _buildingOptions.firstWhere(
+      (entry) =>
+          _normalizeBuildingValue(entry['id']) == filterKey ||
+          _normalizeBuildingValue(entry['name']) == filterKey ||
+          _normalizeBuildingValue(entry['id']).contains(filterKey) ||
+          _normalizeBuildingValue(entry['name']).contains(filterKey),
+      orElse: () => <String, String>{},
+    );
+
+    if (option.isEmpty) return false;
+
+    final optionId = _normalizeBuildingValue(option['id']);
+    final optionName = _normalizeBuildingValue(option['name']);
+    return buildingValues.any((value) {
+      final normalizedValue = _normalizeBuildingValue(value);
+      return normalizedValue == optionId ||
+          normalizedValue == optionName ||
+          normalizedValue.contains(optionId) ||
+          normalizedValue.contains(optionName);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Filter list
     final filtered = _activities.where((act) {
-      if (_activitiesBuildingFilter != 'all' &&
-          act['building'] != _activitiesBuildingFilter) {
+      if (!_matchesBuildingFilter(act)) {
         return false;
       }
       if (_activitiesTab == 'planned') {
@@ -161,46 +242,26 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
                   _activitiesBuildingFilter == 'all',
                   () => setState(() => _activitiesBuildingFilter = 'all'),
                 ),
-                _buildFilterChip(
-                  'Bât. A',
-                  _activitiesBuildingFilter == 'A',
-                  () => setState(() => _activitiesBuildingFilter = 'A'),
-                ),
-                _buildFilterChip(
-                  'Bât. A1',
-                  _activitiesBuildingFilter == 'A1',
-                  () => setState(() => _activitiesBuildingFilter = 'A1'),
-                ),
-                _buildFilterChip(
-                  'Bât. B',
-                  _activitiesBuildingFilter == 'B',
-                  () => setState(() => _activitiesBuildingFilter = 'B'),
-                ),
-                _buildFilterChip(
-                  'Bât. B1',
-                  _activitiesBuildingFilter == 'B1',
-                  () => setState(() => _activitiesBuildingFilter = 'B1'),
-                ),
-                _buildFilterChip(
-                  'Bât. C',
-                  _activitiesBuildingFilter == 'C',
-                  () => setState(() => _activitiesBuildingFilter = 'C'),
-                ),
-                _buildFilterChip(
-                  'Bât. D',
-                  _activitiesBuildingFilter == 'D',
-                  () => setState(() => _activitiesBuildingFilter = 'D'),
-                ),
-                _buildFilterChip(
-                  'Bât. E',
-                  _activitiesBuildingFilter == 'E',
-                  () => setState(() => _activitiesBuildingFilter = 'E'),
-                ),
-                _buildFilterChip(
-                  'Bât. F',
-                  _activitiesBuildingFilter == 'F',
-                  () => setState(() => _activitiesBuildingFilter = 'F'),
-                ),
+                if (_buildingOptions.isNotEmpty)
+                  ..._buildingOptions.map((option) {
+                    final label = option['name']?.trim().isNotEmpty == true
+                        ? option['name']!
+                        : 'Bâtiment';
+                    final value = option['id'] ?? option['name'] ?? 'all';
+                    return _buildFilterChip(
+                      label,
+                      _activitiesBuildingFilter == value,
+                      () => setState(() => _activitiesBuildingFilter = value),
+                    );
+                  })
+                else
+                  ...[
+                    _buildFilterChip(
+                      'Bât. A',
+                      _activitiesBuildingFilter == 'A',
+                      () => setState(() => _activitiesBuildingFilter = 'A'),
+                    ),
+                  ],
               ],
             ),
           ),

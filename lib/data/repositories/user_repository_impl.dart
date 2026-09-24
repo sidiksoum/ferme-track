@@ -20,11 +20,19 @@ class UserRepositoryImpl implements UserRepository {
 
   String _mapRoleToBackend(String role) {
     final r = role.trim().toLowerCase();
-    if (r == 'directeur' || r == 'director') return 'director';
-    if (r == 'technicien' || r == 'technician') return 'technician';
-    if (r == 'magasinier' || r == 'warehouse') return 'warehouse';
-    if (r == 'volailler' || r == 'poultrykeeper') return 'poultrykeeper';
-    return role;
+    if (r == 'directeur' || r == 'director') return 'DIRECTOR';
+    if (r == 'technicien' || r == 'technician') return 'TECHNICIAN';
+    if (r == 'magasinier' || r == 'warehouse') return 'WAREHOUSE';
+    if (r == 'volailler' || r == 'poultrykeeper') return 'POULTRYKEEPER';
+    return role.trim().toUpperCase();
+  }
+
+  String _mapStatusToBackend(String status) {
+    final s = status.trim().toLowerCase();
+    if (s == 'actif' || s == 'active') return 'ACTIVE';
+    if (s == 'inactif' || s == 'inactive') return 'INACTIVE';
+    if (s == 'suspendu' || s == 'suspended') return 'SUSPENDED';
+    return status.trim().toUpperCase();
   }
 
   @override
@@ -73,6 +81,15 @@ class UserRepositoryImpl implements UserRepository {
         return Left(NetworkException(message: 'Pas de connexion Internet.'));
       }
 
+      final cleanedPassword = password.trim();
+      if (cleanedPassword.length < 8) {
+        return Left(
+          ValidationException(
+            message: 'Le mot de passe doit contenir au moins 8 caractères.',
+          ),
+        );
+      }
+
       final mappedRole = _mapRoleToBackend(role);
 
       final response = await apiClient.post(
@@ -84,7 +101,7 @@ class UserRepositoryImpl implements UserRepository {
           'phone': phone,
           'role': mappedRole,
           'must_change_password': true,
-          'password': password,
+          'password': cleanedPassword,
         },
       );
 
@@ -115,6 +132,7 @@ class UserRepositoryImpl implements UserRepository {
       }
 
       final mappedRole = _mapRoleToBackend(role);
+      final mappedStatus = _mapStatusToBackend(status);
 
       final response = await apiClient.put(
         '/users/$userId',
@@ -123,7 +141,7 @@ class UserRepositoryImpl implements UserRepository {
           'full_name': fullName,
           'phone': phone,
           'role': mappedRole,
-          'status': status,
+          'status': mappedStatus,
           'farm_id': farmId,
         },
       );
