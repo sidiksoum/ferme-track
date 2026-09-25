@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dartz/dartz.dart';
 
@@ -74,35 +75,38 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
   @override
   Future<Either<AppException, void>> logout() async {
     try {
-      // Call logout endpoint if connection available
-      if (await _networkChecker.hasConnection) {
-        try {
-          final refreshToken = await _localStorage.getString('refresh_token');
-          if (refreshToken != null) {
-            await _apiClient.post(
-              '/auth/logout',
-              data: {
-                'refreshToken': refreshToken,
-              },
-            );
-          }
-        } catch (e) {
-          AppLogger.warning('Logout endpoint error: $e');
-        }
-      }
+      final refreshToken = await _localStorage.getString('refresh_token');
 
-      // Clear local session
+      // Clear local session & auth token immediately so UI responds instantly
       await _clearSession();
       _apiClient.clearAuthToken();
+
+      // Fire revocation in background without blocking the UI
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        unawaited(
+          _apiClient.post(
+            '/auth/logout',
+            data: {'refreshToken': refreshToken},
+          ).timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => <String, dynamic>{},
+          ).catchError((e) {
+            AppLogger.warning('Background logout error: $e');
+            return <String, dynamic>{};
+          }),
+        );
+      }
 
       AppLogger.info('User logged out successfully');
       return const Right(null);
     } catch (e, stackTrace) {
       AppLogger.error('Logout error', e, stackTrace);
-      return Left(UnknownException(
-        message: 'Logout failed',
-        stackTrace: stackTrace,
-      ));
+      // Even if an error occurred, ensure local state is wiped
+      try {
+        await _clearSession();
+        _apiClient.clearAuthToken();
+      } catch (_) {}
+      return const Right(null);
     }
   }
 

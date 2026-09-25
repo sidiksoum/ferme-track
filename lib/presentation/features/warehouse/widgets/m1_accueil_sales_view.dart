@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/socket_client_service.dart';
 import '../../../../data/datasources/remote/api_client.dart';
+import '../../../providers/auth_provider.dart';
 
 class M1AccueilSalesView extends StatefulWidget {
   final String userName;
@@ -21,6 +23,7 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
 
   String _toggleMode = 'sales'; // sales, stock
   final String _periodFilter = 'today'; // today, 7j, 30j, custom
+  int _buildingsCount = 0;
 
   Map<String, int> _eggFormats = {
     'plusGros': 0,
@@ -30,48 +33,14 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
   };
 
   Map<String, dynamic> _caisseStats = {
-    'today_sales': 45000,
-    'total_sales': 245000,
-    'cash_sales': 178000,
-    'credit_sales': 67000,
-    'total_receivables': 126500,
+    'today_sales': 0,
+    'total_sales': 0,
+    'cash_sales': 0,
+    'credit_sales': 0,
+    'total_receivables': 0,
   };
 
-  List<Map<String, dynamic>> _receivables = [
-    {
-      'client': 'Seydou Yao',
-      'contact': '07 47 48 49 50',
-      'address': 'Gare routière',
-      'saleDetails': '40 plateaux Plus Gros format',
-      'total': 100000,
-      'paid': 35000,
-      'due': 65000,
-      'dueDate': '12/08/2026',
-      'status': 'Échéance dépassée',
-    },
-    {
-      'client': 'Adjoua Tanoh',
-      'contact': '07 08 09 10 11',
-      'address': 'Ferme Soro',
-      'saleDetails': '20 plateaux Gros format',
-      'total': 44000,
-      'paid': 25500,
-      'due': 18500,
-      'dueDate': '28/08/2026',
-      'status': 'Échéance à venir',
-    },
-    {
-      'client': 'Koffi Mensah',
-      'contact': '05 06 07 08 09',
-      'address': 'Marché central',
-      'saleDetails': '12 plateaux Moyen format',
-      'total': 21600,
-      'paid': 9600,
-      'due': 12000,
-      'dueDate': '15/09/2026',
-      'status': 'Échéance à venir',
-    },
-  ];
+  List<Map<String, dynamic>> _receivables = [];
 
   @override
   void initState() {
@@ -85,7 +54,8 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
           eventName.contains('stock') ||
           eventName.contains('reception') ||
           eventName.contains('egg') ||
-          eventName.contains('order')) {
+          eventName.contains('order') ||
+          eventName.contains('credit')) {
         if (mounted) {
           _loadDashboardData(forceRefresh: true);
         }
@@ -104,7 +74,23 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
       _loadEggStocks(forceRefresh: forceRefresh),
       _loadCaisseStats(forceRefresh: forceRefresh),
       _loadReceivables(forceRefresh: forceRefresh),
+      _loadBuildingsCount(forceRefresh: forceRefresh),
     ]);
+  }
+
+  Future<void> _loadBuildingsCount({bool forceRefresh = false}) async {
+    try {
+      final response = await _apiClient.get(
+        '/buildings',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (mounted && response is List) {
+        setState(() {
+          _buildingsCount = response.length;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadEggStocks({bool forceRefresh = false}) async {
@@ -181,9 +167,9 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
         forceRefresh: forceRefresh,
         useCache: true,
       );
-      if (mounted && response is List && response.isNotEmpty) {
+      if (mounted && response is List) {
         setState(() {
-          _receivables = response.map<Map<String, dynamic>>((r) {
+          _receivables = response.whereType<Map>().map<Map<String, dynamic>>((r) {
             final due =
                 (r['due'] as num?)?.toInt() ??
                 (r['balance'] as num?)?.toInt() ??
@@ -213,18 +199,26 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
     return Column(
       children: [
         // Actor Welcome Sub-header
-        Container(
-          width: double.infinity,
-          color: AppColors.primaryLight.withOpacity(0.3),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-          child: Text(
-            'Bonjour, ${widget.userName}  ·  Ferme Soro  ·  8 bâtiments actifs',
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryDark,
-            ),
-          ),
+        Consumer<AuthNotifier>(
+          builder: (context, auth, _) {
+            final farmName = auth.currentUser?.farmName ?? 'Ferme';
+            final buildingText = _buildingsCount > 0
+                ? '  ·  $_buildingsCount bâtiment${_buildingsCount > 1 ? 's' : ''} actif${_buildingsCount > 1 ? 's' : ''}'
+                : '';
+            return Container(
+              width: double.infinity,
+              color: AppColors.primaryLight.withOpacity(0.3),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+              child: Text(
+                'Bonjour, ${widget.userName}  ·  $farmName$buildingText',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+            );
+          },
         ),
 
         // Sub tabs
@@ -350,7 +344,41 @@ class _M1AccueilSalesViewState extends State<M1AccueilSalesView> {
           ],
         ),
         const SizedBox(height: 9),
-        ..._receivables.map(_buildReceivableCard),
+        if (_receivables.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: const Column(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 36,
+                  color: AppColors.syncGreen,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Aucune créance en cours',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.ink,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Tous les paiements des clients sont à jour.',
+                  style: TextStyle(fontSize: 12, color: AppColors.inkSoft),
+                ),
+              ],
+            ),
+          )
+        else
+          ..._receivables.map(_buildReceivableCard),
       ],
     );
   }

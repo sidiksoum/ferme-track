@@ -226,7 +226,9 @@ class _V1TasksViewState extends State<V1TasksView> {
             onRefresh: () => _loadTasks(forceRefresh: true),
             child: ListView.builder(
               padding: const EdgeInsets.all(14),
-              itemCount: _isLoading || _error != null ? 1 : visibleTasks.length,
+              itemCount: _isLoading || _error != null || visibleTasks.isEmpty
+                  ? 1
+                  : visibleTasks.length,
               itemBuilder: (context, index) {
                 if (_isLoading) {
                   return const Center(
@@ -264,14 +266,42 @@ class _V1TasksViewState extends State<V1TasksView> {
                 if (visibleTasks.isEmpty) {
                   return Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(
-                        _activeTab == 'todo'
-                            ? 'Aucune tâche à faire pour le moment.'
-                            : _activeTab == 'pending_validation'
-                                ? 'Aucune tâche en attente de validation.'
-                                : 'Aucune tâche terminée.',
-                        style: const TextStyle(color: AppColors.inkSoft),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _activeTab == 'todo'
+                                ? Icons.task_alt
+                                : _activeTab == 'pending_validation'
+                                    ? Icons.pending_actions
+                                    : Icons.assignment_turned_in_outlined,
+                            size: 48,
+                            color: AppColors.inkSoft.withOpacity(0.4),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Aucune tâche disponible',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _activeTab == 'todo'
+                                ? 'Aucune tâche à faire pour le moment.'
+                                : _activeTab == 'pending_validation'
+                                    ? 'Aucune tâche en attente de validation.'
+                                    : 'Aucune tâche terminée.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.inkSoft,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );

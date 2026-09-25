@@ -56,7 +56,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                 children: [
                   Text(_getAppBarTitle(userName)),
                   Text(
-                    _getAppBarSubtitle(),
+                    _getAppBarSubtitle(authNotifier.currentUser?.farmName ?? 'Ferme'),
                     style: AppTypography.appbarSubtitle,
                   ),
                 ],
@@ -186,10 +186,10 @@ class _PlanningScreenState extends State<PlanningScreen> {
     }
   }
 
-  String _getAppBarSubtitle() {
+  String _getAppBarSubtitle(String farmName) {
     switch (_selectedNavIndex) {
       case 0:
-        return 'Ferme Soro · Suivi technique';
+        return '$farmName · Suivi technique';
       case 1:
         return 'Gestion des tâches quotidiennes';
       case 2:
@@ -199,7 +199,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
       case 4:
         return 'Bâtiments, lots et affectation';
       default:
-        return 'Ferme Soro';
+        return farmName;
     }
   }
 

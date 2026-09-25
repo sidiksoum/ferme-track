@@ -142,24 +142,28 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
   }
 
   bool _matchesBuildingFilter(Map<String, dynamic> building) {
-    if (_buildingFilter == 'Tous') return true;
+    if (_buildingFilter == 'Tous' || _buildingFilter == 'all') return true;
 
     final filterKey = _normalizeBuildingValue(_buildingFilter);
-    if (filterKey.isEmpty) return false;
+    if (filterKey.isEmpty) return true;
 
-    final candidates = [
-      building['id']?.toString(),
-      building['buildingId']?.toString(),
-      building['buildingName']?.toString(),
-      building['name']?.toString(),
-    ];
+    final id = building['id']?.toString() ?? '';
+    final name = building['name']?.toString() ?? '';
+    final bName = building['buildingName']?.toString() ?? '';
 
-    return candidates.any((value) {
-      final normalized = _normalizeBuildingValue(value);
-      return normalized == filterKey ||
-          normalized.contains(filterKey) ||
-          filterKey.contains(normalized);
-    });
+    if (_buildingFilter == id || _buildingFilter == name || _buildingFilter == bName) {
+      return true;
+    }
+
+    final normId = _normalizeBuildingValue(id);
+    final normName = _normalizeBuildingValue(name);
+    final normBName = _normalizeBuildingValue(bName);
+
+    return normId == filterKey ||
+        normName == filterKey ||
+        normBName == filterKey ||
+        normName.contains(filterKey) ||
+        filterKey.contains(normName);
   }
 
   @override
@@ -254,26 +258,18 @@ class _D7StatsTableViewState extends State<D7StatsTableView> {
                     ..._buildingOptions.map((option) {
                       final label = option['name']?.toString() ?? 'Bâtiment';
                       final value = option['id']?.toString() ?? label;
+                      final isSelected = _buildingFilter == value ||
+                          _buildingFilter == option['id'] ||
+                          _buildingFilter == option['name'];
                       return _buildFilterChip(
                         label,
-                        _buildingFilter == value,
+                        isSelected,
                         () {
                           setState(() => _buildingFilter = value);
                           _loadStatsData(forceRefresh: true);
                         },
                       );
-                    })
-                  else
-                    ...[
-                      _buildFilterChip(
-                        'Bâtiment',
-                        _buildingFilter == 'Bâtiment',
-                        () {
-                          setState(() => _buildingFilter = 'Bâtiment');
-                          _loadStatsData(forceRefresh: true);
-                        },
-                      ),
-                    ],
+                    }),
                 ],
               ),
             ),

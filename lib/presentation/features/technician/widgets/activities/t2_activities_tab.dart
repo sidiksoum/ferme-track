@@ -34,49 +34,24 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
   }
 
   bool _matchesBuildingFilter(Map<String, dynamic> act) {
-    if (_selectedBuildingFilter == 'all') return true;
+    if (_selectedBuildingFilter == 'all' || _selectedBuildingFilter == 'Tous' || _selectedBuildingFilter == 'Tous Bât.') return true;
 
-    final filterKey = _normalizeBuildingValue(_selectedBuildingFilter);
-    if (filterKey.isEmpty) return false;
+    final filter = _selectedBuildingFilter.trim();
+    final filterKey = _normalizeBuildingValue(filter);
+    if (filterKey.isEmpty) return true;
 
-    final buildingValues = [
-      act['building'],
-      act['buildingName'],
-      act['building_id'],
-      act['idBuilding'],
-      act['buildingId'],
-      act['building_name'],
-    ].whereType<String>().toList();
+    final buildingId = act['buildingId']?.toString() ?? act['building_id']?.toString() ?? act['idBuilding']?.toString() ?? '';
+    final buildingName = act['buildingName']?.toString() ?? act['building']?.toString() ?? '';
 
-    final matches = buildingValues.any((value) {
-      final normalizedValue = _normalizeBuildingValue(value);
-      return normalizedValue == filterKey ||
-          normalizedValue.contains(filterKey) ||
-          filterKey.contains(normalizedValue);
-    });
+    if (buildingId == filter || buildingName == filter) return true;
 
-    if (matches) return true;
+    final normId = _normalizeBuildingValue(buildingId);
+    final normName = _normalizeBuildingValue(buildingName);
 
-    final buildingOption = widget.buildingOptions.firstWhere(
-      (option) =>
-          _normalizeBuildingValue(option['id']) == filterKey ||
-          _normalizeBuildingValue(option['name']) == filterKey ||
-          _normalizeBuildingValue(option['id']).contains(filterKey) ||
-          _normalizeBuildingValue(option['name']).contains(filterKey),
-      orElse: () => <String, String>{},
-    );
-
-    if (buildingOption.isEmpty) return false;
-
-    final optionId = _normalizeBuildingValue(buildingOption['id']);
-    final optionName = _normalizeBuildingValue(buildingOption['name']);
-    return buildingValues.any((value) {
-      final normalizedValue = _normalizeBuildingValue(value);
-      return normalizedValue == optionId ||
-          normalizedValue == optionName ||
-          normalizedValue.contains(optionId) ||
-          normalizedValue.contains(optionName);
-    });
+    return normId == filterKey ||
+        normName == filterKey ||
+        normName.contains(filterKey) ||
+        filterKey.contains(normName);
   }
 
   @override
@@ -159,20 +134,15 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
                         ? option['name']!
                         : 'Bâtiment';
                     final value = option['id'] ?? option['name'] ?? 'all';
+                    final isSelected = _selectedBuildingFilter == value ||
+                        _selectedBuildingFilter == option['name'] ||
+                        _selectedBuildingFilter == option['id'];
                     return _buildFilterChip(
                       label,
-                      _selectedBuildingFilter == value,
+                      isSelected,
                       () => setState(() => _selectedBuildingFilter = value),
                     );
-                  })
-                else
-                  ...[
-                    _buildFilterChip(
-                      'Bât. A',
-                      _selectedBuildingFilter == 'A',
-                      () => setState(() => _selectedBuildingFilter = 'A'),
-                    ),
-                  ],
+                  }),
               ],
             ),
           ),

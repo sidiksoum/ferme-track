@@ -8,6 +8,7 @@ class UserRemoteDto {
   final String fullName;
   final String role;
   final String? farmId;
+  final String? farmName;
   final String? avatarUrl;
   final bool isActive;
   final DateTime createdAt;
@@ -20,6 +21,7 @@ class UserRemoteDto {
     required this.fullName,
     required this.role,
     this.farmId,
+    this.farmName,
     this.avatarUrl,
     required this.isActive,
     required this.createdAt,
@@ -41,6 +43,7 @@ class UserRemoteDto {
       fullName: fullName,
       role: mappedRole,
       farmId: farmId,
+      farmName: farmName,
       avatarUrl: avatarUrl,
       isActive: isActive,
       createdAt: createdAt,
@@ -56,6 +59,7 @@ class UserRemoteDto {
       fullName: map['full_name'] ?? map['fullName'] ?? '',
       role: map['role'] ?? '',
       farmId: map['farm_id'] ?? map['farmId'],
+      farmName: map['farm_name'] ?? map['farmName'] ?? (map['farm'] is Map ? map['farm']['name'] : null),
       avatarUrl: map['avatar_url'] ?? map['avatarUrl'],
       isActive: map['is_active'] ?? map['isActive'] ?? false,
       createdAt: DateTime.tryParse(map['created_at'] ?? map['createdAt'] ?? '') ?? DateTime.now(),
@@ -71,6 +75,7 @@ class UserRemoteDto {
       'full_name': fullName,
       'role': role,
       'farm_id': farmId,
+      'farm_name': farmName,
       'avatar_url': avatarUrl,
       'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
@@ -130,6 +135,7 @@ class UserLocalDto {
   final String fullName;
   final String role;
   final String? farmId;
+  final String? farmName;
   final String? avatarUrl;
 
   UserLocalDto({
@@ -139,6 +145,7 @@ class UserLocalDto {
     required this.fullName,
     required this.role,
     this.farmId,
+    this.farmName,
     this.avatarUrl,
   });
 
@@ -157,6 +164,7 @@ class UserLocalDto {
       fullName: fullName,
       role: mappedRole,
       farmId: farmId,
+      farmName: farmName,
       avatarUrl: avatarUrl,
       isActive: true,
       createdAt: DateTime.now(),
@@ -172,6 +180,7 @@ class UserLocalDto {
       fullName: user.fullName,
       role: user.role,
       farmId: user.farmId,
+      farmName: user.farmName,
       avatarUrl: user.avatarUrl,
     );
   }
@@ -184,6 +193,7 @@ class UserLocalDto {
       fullName: map['full_name'] ?? '',
       role: map['role'] ?? '',
       farmId: map['farm_id'],
+      farmName: map['farm_name'] ?? map['farmName'],
       avatarUrl: map['avatar_url'],
     );
   }
@@ -196,6 +206,7 @@ class UserLocalDto {
       'full_name': fullName,
       'role': role,
       'farm_id': farmId,
+      'farm_name': farmName,
       'avatar_url': avatarUrl,
     };
   }

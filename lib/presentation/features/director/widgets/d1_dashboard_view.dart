@@ -68,19 +68,15 @@ class _D1DashboardViewState extends State<D1DashboardView> {
       final activities = response['activities'] as Map? ?? {};
 
       setState(() {
-        if (summary['eggs_today'] != null) {
-          _eggsToday = (summary['eggs_today'] as num).toInt();
-        }
-        if (summary['deaths_today'] != null) {
-          _deathsToday = (summary['deaths_today'] as num).toInt();
-        }
-        if (summary['total_birds'] != null) {
-          _totalBirds = (summary['total_birds'] as num).toInt();
-        }
+        _eggsToday = (summary['eggs_today'] as num?)?.toInt() ?? 0;
+        _deathsToday = (summary['deaths_today'] as num?)?.toInt() ?? 0;
+        _totalBirds = (summary['total_birds'] as num?)?.toInt() ?? 0;
         if (summary['activities_rate'] != null) {
           _activitiesRate = (summary['activities_rate'] as num).toInt();
         } else if (activities['rate_percent'] != null) {
           _activitiesRate = (activities['rate_percent'] as num).toInt();
+        } else {
+          _activitiesRate = 0;
         }
       });
     } catch (_) {}
@@ -157,7 +153,7 @@ class _D1DashboardViewState extends State<D1DashboardView> {
                 KpiCard(
                   icon: Icons.pets,
                   value: _formatNumber(_totalBirds),
-                  label: 'Volailles — toutes fermes',
+                  label: 'Volailles — totales ferme',
                 ),
                 KpiCard(
                   icon: Icons.done_all,

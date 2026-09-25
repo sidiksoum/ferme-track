@@ -493,21 +493,12 @@ class _T2AddOrderFormState extends State<T2AddOrderForm> {
     final rawOptions = {
       'aliment': [
         'Aliments',
-        'Aliment ponte 20 kg',
-        'Aliment démarrage 25 kg',
-        'Aliment croissance',
       ],
       'sanitaire': [
         'Produit veto',
-        'Vaccin Newcastle',
-        'Vitamines complexes',
-        'Vermifuge aviaire',
       ],
       'volaille': [
         'Volailles',
-        'Poussins d\'un jour',
-        'Poules pondeuses',
-        'Poulets de chair',
       ],
     };
 
@@ -518,7 +509,7 @@ class _T2AddOrderFormState extends State<T2AddOrderForm> {
       }
     }
 
-    if (!options.contains(_orderArticle)) {
+    if (!options.contains(_orderArticle) && options.isNotEmpty) {
       _orderArticle = options.first;
     }
 

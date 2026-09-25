@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../config/theme/app_theme.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/system_notification_service.dart';
+import '../../../../data/datasources/remote/api_client.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/d1_dashboard_view.dart';
@@ -21,13 +23,40 @@ class DirectorDashboardScreen extends StatefulWidget {
 }
 
 class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
+  final ApiClient _apiClient = getIt<ApiClient>();
   int _selectedNavIndex = 0;
   bool _isShowingNotifications = false;
+  int _buildingsCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBuildingsCount();
+  }
+
+  Future<void> _loadBuildingsCount({bool forceRefresh = false}) async {
+    try {
+      final response = await _apiClient.get(
+        '/buildings',
+        forceRefresh: forceRefresh,
+        useCache: true,
+      );
+      if (mounted && response is List) {
+        setState(() {
+          _buildingsCount = response.length;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
     final authNotifier = context.watch<AuthNotifier>();
     final userName = authNotifier.currentUser?.fullName ?? 'Koffi';
+    final farmName = authNotifier.currentUser?.farmName ?? 'Ferme';
+    final buildingText = _buildingsCount > 0
+        ? ' · $_buildingsCount bâtiment${_buildingsCount > 1 ? 's' : ''} actif${_buildingsCount > 1 ? 's' : ''}'
+        : '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAF7),
@@ -56,8 +85,8 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Bonjour, $userName'),
-                  const Text(
-                    'Ferme Soro · 8 bâtiments actifs',
+                  Text(
+                    '$farmName$buildingText',
                     style: AppTypography.appbarSubtitle,
                   ),
                 ],

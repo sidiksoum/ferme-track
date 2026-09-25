@@ -6,6 +6,7 @@ class User {
   final String fullName;
   final String role;
   final String? farmId;
+  final String? farmName;
   final String? avatarUrl;
   final bool isActive;
   final DateTime createdAt;
@@ -18,6 +19,7 @@ class User {
     required this.fullName,
     required this.role,
     this.farmId,
+    this.farmName,
     this.avatarUrl,
     required this.isActive,
     required this.createdAt,
@@ -31,6 +33,7 @@ class User {
     String? fullName,
     String? role,
     String? farmId,
+    String? farmName,
     String? avatarUrl,
     bool? isActive,
     DateTime? createdAt,
@@ -43,6 +46,7 @@ class User {
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
       farmId: farmId ?? this.farmId,
+      farmName: farmName ?? this.farmName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
@@ -58,6 +62,7 @@ class User {
       'fullName': fullName,
       'role': role,
       'farmId': farmId,
+      'farmName': farmName,
       'avatarUrl': avatarUrl,
       'isActive': isActive,
       'createdAt': createdAt.toIso8601String(),
@@ -70,13 +75,14 @@ class User {
       id: map['id'] ?? '',
       username: map['username'] ?? '',
       email: map['email'] ?? '',
-      fullName: map['fullName'] ?? '',
+      fullName: map['fullName'] ?? map['full_name'] ?? '',
       role: map['role'] ?? '',
-      farmId: map['farmId'],
-      avatarUrl: map['avatarUrl'],
-      isActive: map['isActive'] ?? false,
-      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updatedAt'] ?? '') ?? DateTime.now(),
+      farmId: map['farmId'] ?? map['farm_id'],
+      farmName: map['farmName'] ?? map['farm_name'] ?? (map['farm'] is Map ? map['farm']['name'] : null),
+      avatarUrl: map['avatarUrl'] ?? map['avatar_url'],
+      isActive: map['isActive'] ?? map['is_active'] ?? false,
+      createdAt: DateTime.tryParse(map['createdAt'] ?? map['created_at'] ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(map['updatedAt'] ?? map['updated_at'] ?? '') ?? DateTime.now(),
     );
   }
 }

@@ -76,7 +76,6 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
   Future<void> _loadAllInitialData() async {
     if (!mounted) return;
     final farmId = context.read<AuthNotifier>().currentUser?.farmId;
-    if (farmId == null || farmId.isEmpty) return;
 
     await Future.wait([
       _loadFormOptions(farmId),
@@ -86,7 +85,7 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
     ]);
   }
 
-  Future<void> _loadFormOptions(String farmId, {bool forceRefresh = false}) async {
+  Future<void> _loadFormOptions(String? farmId, {bool forceRefresh = false}) async {
     if (!mounted) return;
     if (_buildingOptions.isNotEmpty && !forceRefresh) {
       return;
@@ -96,7 +95,7 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
       final responses = await Future.wait([
         _apiClient.get(
           '/buildings',
-          queryParameters: {'farm_id': farmId},
+          queryParameters: (farmId != null && farmId.isNotEmpty) ? {'farm_id': farmId} : null,
           forceRefresh: forceRefresh,
           useCache: true,
         ),
@@ -196,10 +195,12 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
                             : status == 'late'
                                 ? TaskStatus.late
                                 : TaskStatus.todo,
-                'building': building?.replaceFirst('Bâtiment ', '') ?? '',
+                'buildingId': item['buildingId']?.toString() ?? item['building_id']?.toString() ?? '',
+                'building_id': item['building_id']?.toString() ?? item['buildingId']?.toString() ?? '',
+                'building': building ?? item['buildingName']?.toString() ?? '',
                 'notes': item['notes']?.toString() ?? item['description']?.toString(),
                 'buildingName':
-                    item['buildingName']?.toString() ?? 'Bâtiment non renseigné',
+                    item['buildingName']?.toString() ?? building ?? 'Bâtiment non renseigné',
                 'responsibleName':
                     item['responsibleName']?.toString() ?? 'Responsable non renseigné',
                 'scheduledDate': item['scheduledDate']?.toString(),

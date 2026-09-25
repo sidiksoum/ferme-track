@@ -60,11 +60,9 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
     }
     try {
       final farmId = context.read<AuthNotifier>().currentUser?.farmId;
-      if (farmId == null || farmId.isEmpty) return;
-
       final response = await _apiClient.get(
         '/buildings',
-        queryParameters: {'farm_id': farmId},
+        queryParameters: (farmId != null && farmId.isNotEmpty) ? {'farm_id': farmId} : null,
         forceRefresh: forceRefresh,
         useCache: true,
       );
@@ -110,9 +108,11 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
                     : status == 'late'
                     ? TaskStatus.late
                     : TaskStatus.todo,
+                'buildingId': item['buildingId']?.toString() ?? item['building_id']?.toString() ?? '',
                 'building': item['building']?.toString() ?? '',
                 'buildingName':
                     item['buildingName']?.toString() ??
+                    item['building']?.toString() ??
                     'Bâtiment non renseigné',
                 'responsibleName':
                     item['responsibleName']?.toString() ??
@@ -136,49 +136,24 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
   }
 
   bool _matchesBuildingFilter(Map<String, dynamic> act) {
-    if (_activitiesBuildingFilter == 'all') return true;
+    if (_activitiesBuildingFilter == 'all' || _activitiesBuildingFilter == 'Tous') return true;
 
-    final filterKey = _normalizeBuildingValue(_activitiesBuildingFilter);
-    if (filterKey.isEmpty) return false;
+    final filter = _activitiesBuildingFilter.trim();
+    final filterKey = _normalizeBuildingValue(filter);
+    if (filterKey.isEmpty) return true;
 
-    final buildingValues = [
-      act['building'],
-      act['buildingName'],
-      act['building_id'],
-      act['idBuilding'],
-      act['buildingId'],
-      act['building_name'],
-    ].whereType<String>().toList();
+    final buildingId = act['buildingId']?.toString() ?? act['building_id']?.toString() ?? act['idBuilding']?.toString() ?? '';
+    final buildingName = act['buildingName']?.toString() ?? act['building']?.toString() ?? '';
 
-    final matches = buildingValues.any((value) {
-      final normalizedValue = _normalizeBuildingValue(value);
-      return normalizedValue == filterKey ||
-          normalizedValue.contains(filterKey) ||
-          filterKey.contains(normalizedValue);
-    });
+    if (buildingId == filter || buildingName == filter) return true;
 
-    if (matches) return true;
+    final normId = _normalizeBuildingValue(buildingId);
+    final normName = _normalizeBuildingValue(buildingName);
 
-    final option = _buildingOptions.firstWhere(
-      (entry) =>
-          _normalizeBuildingValue(entry['id']) == filterKey ||
-          _normalizeBuildingValue(entry['name']) == filterKey ||
-          _normalizeBuildingValue(entry['id']).contains(filterKey) ||
-          _normalizeBuildingValue(entry['name']).contains(filterKey),
-      orElse: () => <String, String>{},
-    );
-
-    if (option.isEmpty) return false;
-
-    final optionId = _normalizeBuildingValue(option['id']);
-    final optionName = _normalizeBuildingValue(option['name']);
-    return buildingValues.any((value) {
-      final normalizedValue = _normalizeBuildingValue(value);
-      return normalizedValue == optionId ||
-          normalizedValue == optionName ||
-          normalizedValue.contains(optionId) ||
-          normalizedValue.contains(optionName);
-    });
+    return normId == filterKey ||
+        normName == filterKey ||
+        normName.contains(filterKey) ||
+        filterKey.contains(normName);
   }
 
   @override
@@ -248,20 +223,15 @@ class _D3ActivitiesViewState extends State<D3ActivitiesView> {
                         ? option['name']!
                         : 'Bâtiment';
                     final value = option['id'] ?? option['name'] ?? 'all';
+                    final isSelected = _activitiesBuildingFilter == value ||
+                        _activitiesBuildingFilter == option['name'] ||
+                        _activitiesBuildingFilter == option['id'];
                     return _buildFilterChip(
                       label,
-                      _activitiesBuildingFilter == value,
+                      isSelected,
                       () => setState(() => _activitiesBuildingFilter = value),
                     );
-                  })
-                else
-                  ...[
-                    _buildFilterChip(
-                      'Bât. A',
-                      _activitiesBuildingFilter == 'A',
-                      () => setState(() => _activitiesBuildingFilter = 'A'),
-                    ),
-                  ],
+                  }),
               ],
             ),
           ),

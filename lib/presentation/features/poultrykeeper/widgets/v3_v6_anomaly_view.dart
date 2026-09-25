@@ -21,9 +21,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
   String _activeTab = 'mortality'; // mortality, other
 
   // Mortality states
-  int _mortalityCount = 3;
+  int _mortalityCount = 1;
   String _mortalityCause = 'heat'; // heat, disease, unknown
-  String _mortalityBuilding = 'Bâtiment A';
+  String _mortalityBuilding = '';
   final TextEditingController _mortalityCommentController =
       TextEditingController();
 
@@ -32,7 +32,7 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
   String _anomalySeverity = 'high'; // low, high
   final TextEditingController _anomalyNotesController = TextEditingController();
 
-  List<String> _buildingsList = ['Bâtiment A', 'Bâtiment B', 'Bâtiment C', 'Bâtiment D'];
+  List<String> _buildingsList = [];
   bool _isSubmitting = false;
 
   @override
@@ -45,7 +45,7 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
     try {
       final response = await _apiClient.get('/buildings', useCache: true);
 
-      if (response is List && response.isNotEmpty) {
+      if (response is List) {
         final names = <String>[];
         for (final item in response) {
           if (item is Map && item['name'] != null) {
@@ -54,11 +54,15 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
             names.add(item);
           }
         }
-        if (names.isNotEmpty && mounted) {
+        if (mounted) {
           setState(() {
             _buildingsList = names;
-            if (!_buildingsList.contains(_mortalityBuilding)) {
-              _mortalityBuilding = _buildingsList.first;
+            if (_buildingsList.isNotEmpty) {
+              if (!_buildingsList.contains(_mortalityBuilding) || _mortalityBuilding.isEmpty) {
+                _mortalityBuilding = _buildingsList.first;
+              }
+            } else {
+              _mortalityBuilding = '';
             }
           });
         }
@@ -78,6 +82,19 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez ajouter un commentaire explicatif'),
+        ),
+      );
+      return;
+    }
+
+    if (_mortalityBuilding.isEmpty && _buildingsList.isNotEmpty) {
+      _mortalityBuilding = _buildingsList.first;
+    }
+
+    if (_mortalityBuilding.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucun bâtiment disponible pour enregistrer la mortalité.'),
         ),
       );
       return;
@@ -343,23 +360,44 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         ),
         const SizedBox(height: 14),
 
-        const Text('BÂTIMENT CONCERNÉ', style: AppTypography.label),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _buildingsList.contains(_mortalityBuilding)
-              ? _mortalityBuilding
-              : _buildingsList.first,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-          items: _buildingsList
-              .map(
-                (building) =>
-                    DropdownMenuItem(value: building, child: Text(building)),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value != null) setState(() => _mortalityBuilding = value);
-          },
-        ),
+        if (_buildingsList.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 18, color: AppColors.inkSoft),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Aucun bâtiment disponible en base.',
+                    style: TextStyle(fontSize: 12, color: AppColors.inkSoft),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          DropdownButtonFormField<String>(
+            value: _buildingsList.contains(_mortalityBuilding)
+                ? _mortalityBuilding
+                : (_buildingsList.isNotEmpty ? _buildingsList.first : null),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _buildingsList
+                .map(
+                  (building) =>
+                      DropdownMenuItem(value: building, child: Text(building)),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _mortalityBuilding = value);
+            },
+          ),
         const SizedBox(height: 24),
 
         SizedBox(
