@@ -9,7 +9,7 @@ class T2ActivitiesTab extends StatefulWidget {
   final List<Map<String, dynamic>> activities;
   final List<Map<String, String>> buildingOptions;
   final bool isLoading;
-  final VoidCallback onRefresh;
+  final Future<void> Function() onRefresh;
 
   const T2ActivitiesTab({
     super.key,
@@ -25,7 +25,8 @@ class T2ActivitiesTab extends StatefulWidget {
 
 class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
   final ApiClient _apiClient = getIt<ApiClient>();
-  String _activitiesTab = 'in_progress'; // in_progress, pending_validation, done
+  String _activitiesTab =
+      'in_progress'; // in_progress, pending_validation, done
   String _selectedBuildingFilter = 'all'; // all, A, A1, B, B1, C, D, E, F
 
   String _normalizeBuildingValue(String? value) {
@@ -34,14 +35,22 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
   }
 
   bool _matchesBuildingFilter(Map<String, dynamic> act) {
-    if (_selectedBuildingFilter == 'all' || _selectedBuildingFilter == 'Tous' || _selectedBuildingFilter == 'Tous Bât.') return true;
+    if (_selectedBuildingFilter == 'all' ||
+        _selectedBuildingFilter == 'Tous' ||
+        _selectedBuildingFilter == 'Tous Bât.')
+      return true;
 
     final filter = _selectedBuildingFilter.trim();
     final filterKey = _normalizeBuildingValue(filter);
     if (filterKey.isEmpty) return true;
 
-    final buildingId = act['buildingId']?.toString() ?? act['building_id']?.toString() ?? act['idBuilding']?.toString() ?? '';
-    final buildingName = act['buildingName']?.toString() ?? act['building']?.toString() ?? '';
+    final buildingId =
+        act['buildingId']?.toString() ??
+        act['building_id']?.toString() ??
+        act['idBuilding']?.toString() ??
+        '';
+    final buildingName =
+        act['buildingName']?.toString() ?? act['building']?.toString() ?? '';
 
     if (buildingId == filter || buildingName == filter) return true;
 
@@ -56,26 +65,26 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredActivities = widget.activities.where((act) {
-      if (!_matchesBuildingFilter(act)) {
-        return false;
-      }
-      if (_activitiesTab == 'pending_validation') {
-        return act['status'] == TaskStatus.pendingValidation;
-      }
-      if (_activitiesTab == 'done') {
-        return act['status'] == TaskStatus.done;
-      }
-      return act['status'] == TaskStatus.inProgress ||
-          act['status'] == TaskStatus.partial ||
-          act['status'] == TaskStatus.late ||
-          act['status'] == TaskStatus.todo;
-    }).toList()
-      ..sort(
-        (a, b) => (b['scheduledDate']?.toString() ?? '').compareTo(
-          a['scheduledDate']?.toString() ?? '',
-        ),
-      );
+    final filteredActivities =
+        widget.activities.where((act) {
+          if (!_matchesBuildingFilter(act)) {
+            return false;
+          }
+          if (_activitiesTab == 'pending_validation') {
+            return act['status'] == TaskStatus.pendingValidation;
+          }
+          if (_activitiesTab == 'done') {
+            return act['status'] == TaskStatus.done;
+          }
+          return act['status'] == TaskStatus.inProgress ||
+              act['status'] == TaskStatus.partial ||
+              act['status'] == TaskStatus.late ||
+              act['status'] == TaskStatus.todo;
+        }).toList()..sort(
+          (a, b) => (b['scheduledDate']?.toString() ?? '').compareTo(
+            a['scheduledDate']?.toString() ?? '',
+          ),
+        );
 
     return Column(
       children: [
@@ -134,7 +143,8 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
                         ? option['name']!
                         : 'Bâtiment';
                     final value = option['id'] ?? option['name'] ?? 'all';
-                    final isSelected = _selectedBuildingFilter == value ||
+                    final isSelected =
+                        _selectedBuildingFilter == value ||
                         _selectedBuildingFilter == option['name'] ||
                         _selectedBuildingFilter == option['id'];
                     return _buildFilterChip(
@@ -151,57 +161,67 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
 
         // Main listings
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            children: [
-              const Text(
-                'ACTIVITÉS DE LA SEMAINE',
-                style: AppTypography.labelSmall,
-              ),
-              const SizedBox(height: 8),
-              if (widget.isLoading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (filteredActivities.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: Text(
-                      'Aucune activité enregistrée.',
-                      style: TextStyle(color: AppColors.inkSoft),
+          child: RefreshIndicator(
+            onRefresh: widget.onRefresh,
+            color: AppColors.primaryDark,
+            backgroundColor: AppColors.paper,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              children: [
+                const Text(
+                  'ACTIVITÉS DE LA SEMAINE',
+                  style: AppTypography.labelSmall,
+                ),
+                const SizedBox(height: 8),
+                if (widget.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (filteredActivities.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Text(
+                        'Aucune activité enregistrée.',
+                        style: TextStyle(color: AppColors.inkSoft),
+                      ),
                     ),
                   ),
-                ),
-              ...filteredActivities.map((act) {
-                IconData icon = Icons.task_alt;
-                final title = act['title'].toString().toLowerCase();
-                if (title.contains('aliment')) {
-                  icon = Icons.restaurant;
-                } else if (title.contains('ramassage') || title.contains('oeuf') || title.contains('œuf')) {
-                  icon = Icons.egg;
-                } else if (title.contains('vaccin') || title.contains('vitamine') || title.contains('deparasitant')) {
-                  icon = Icons.healing;
-                }
+                ...filteredActivities.map((act) {
+                  IconData icon = Icons.task_alt;
+                  final title = act['title'].toString().toLowerCase();
+                  if (title.contains('aliment')) {
+                    icon = Icons.restaurant;
+                  } else if (title.contains('ramassage') ||
+                      title.contains('oeuf') ||
+                      title.contains('œuf')) {
+                    icon = Icons.egg;
+                  } else if (title.contains('vaccin') ||
+                      title.contains('vitamine') ||
+                      title.contains('deparasitant')) {
+                    icon = Icons.healing;
+                  }
 
-                return TaskCard(
-                  icon: icon,
-                  title: act['title'] ?? 'Activité',
-                  meta:
-                      '${act['buildingName']} · ${act['responsibleName']} · ${act['scheduledDate']?.toString().split('T').first ?? ''} · ${act['meta']} - ${act['endTime'] ?? ''}',
-                  status: act['status'] ?? TaskStatus.todo,
-                  onTap: () {
-                    if (act['status'] == TaskStatus.pendingValidation) {
-                      _showValidationDialog(act);
-                    } else {
-                      _showActivityDetails(act);
-                    }
-                  },
-                );
-              }),
-              const SizedBox(height: 80),
-            ],
+                  return TaskCard(
+                    icon: icon,
+                    title: act['title'] ?? 'Activité',
+                    meta:
+                        '${act['buildingName']} · ${act['responsibleName']} · ${act['scheduledDate']?.toString().split('T').first ?? ''} · ${act['meta']} - ${act['endTime'] ?? ''}',
+                    status: act['status'] ?? TaskStatus.todo,
+                    onTap: () {
+                      if (act['status'] == TaskStatus.pendingValidation) {
+                        _showValidationDialog(act);
+                      } else {
+                        _showActivityDetails(act);
+                      }
+                    },
+                  );
+                }),
+                const SizedBox(height: 80),
+              ],
+            ),
           ),
         ),
       ],
@@ -289,7 +309,7 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
                   ),
                 const SizedBox(height: 14),
                 const Text(
-                  'Commentaire de réalisation (Requis) :',
+                  'Commentaire de réalisation (optionnel) :',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                 ),
                 const SizedBox(height: 6),
@@ -310,16 +330,6 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (commentController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Un commentaire de réalisation est requis pour confirmer la tâche',
-                      ),
-                    ),
-                  );
-                  return;
-                }
                 Navigator.pop(context);
                 await _confirmActivity(act, commentController.text.trim());
               },
@@ -438,7 +448,9 @@ class _T2ActivitiesTabState extends State<T2ActivitiesTab> {
       if (decoded is Map) {
         final lines = <String>[];
         if (decoded['feedQtyKg'] != null) {
-          lines.add('Quantité d\'aliment distribué : ${decoded['feedQtyKg']} kg');
+          lines.add(
+            'Quantité d\'aliment distribué : ${decoded['feedQtyKg']} kg',
+          );
         }
         if (decoded['dose'] != null) {
           lines.add('Quantité dose utilisée : ${decoded['dose']}');

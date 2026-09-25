@@ -20,23 +20,27 @@ class V2CloseTaskView extends StatefulWidget {
 
 class _V2CloseTaskViewState extends State<V2CloseTaskView> {
   // Feed distribution states
-  int _feedQty = 75;
+  int _feedQty = 0;
   final TextEditingController _feedCommentController = TextEditingController();
 
   // Sanitary treatments (Vitamine, Déparasitant, Vaccination, Injection)
-  int _doseQty = 1;
-  final TextEditingController _sanitaryCommentController = TextEditingController();
+  int _doseQty = 0;
+  final TextEditingController _sanitaryCommentController =
+      TextEditingController();
 
   // Weighing (Pesée)
-  double _weightVal = 1.85; // kg
-  final TextEditingController _weightController = TextEditingController(text: '1.85');
-  final TextEditingController _weighingCommentController = TextEditingController();
+  double _weightVal = 0; // kg
+  final TextEditingController _weightController = TextEditingController(
+    text: '5',
+  );
+  final TextEditingController _weighingCommentController =
+      TextEditingController();
 
   // Egg collection states
-  int _eggsPlusGros = 120;
-  int _eggsGros = 420;
-  int _eggsMoyen = 760;
-  int _eggsPetit = 340;
+  int _eggsPlusGros = 0;
+  int _eggsGros = 0;
+  int _eggsMoyen = 0;
+  int _eggsPetit = 0;
   final TextEditingController _eggObservationController =
       TextEditingController();
   final TextEditingController _generalObservationController =
@@ -45,7 +49,8 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
 
   // Cleaning states
   bool _cleaningConfirmed = false;
-  final TextEditingController _cleaningCommentController = TextEditingController();
+  final TextEditingController _cleaningCommentController =
+      TextEditingController();
 
   // Temperature states
   int _temperatureVal = 24;
@@ -83,12 +88,14 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
     final taskType = (task['taskType'] as String? ?? '').toLowerCase();
     final combined = '$title $desc $taskType';
 
-    final bool isFeeding = taskType == 'feeding' ||
+    final bool isFeeding =
+        taskType == 'feeding' ||
         combined.contains('aliment') ||
         combined.contains('abrev') ||
         combined.contains('nourr');
 
-    final bool isSanitary = taskType == 'treatment' ||
+    final bool isSanitary =
+        taskType == 'treatment' ||
         taskType == 'vaccination' ||
         combined.contains('vitamine') ||
         combined.contains('vitamin') ||
@@ -104,25 +111,28 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
         combined.contains('médicament') ||
         combined.contains('medicament');
 
-    final bool isWeighing = taskType == 'inspection' ||
+    final bool isWeighing =
+        taskType == 'inspection' ||
         combined.contains('pes') ||
         combined.contains('poids');
 
-    final bool isEggCollection = taskType == 'egg_collection' ||
+    final bool isEggCollection =
+        taskType == 'egg_collection' ||
         combined.contains('oeuf') ||
         combined.contains('œuf') ||
         combined.contains('ramassage') ||
         combined.contains('ponte') ||
         combined.contains('collecte');
 
-    final bool isCleaning = taskType == 'cleaning' ||
+    final bool isCleaning =
+        taskType == 'cleaning' ||
         combined.contains('nettoy') ||
         combined.contains('desinfect') ||
         combined.contains('désinfect') ||
         combined.contains('lavage');
 
-    final bool isTemperature = combined.contains('température') ||
-        combined.contains('temperature');
+    final bool isTemperature =
+        combined.contains('température') || combined.contains('temperature');
 
     return SingleChildScrollView(
       child: Column(
@@ -340,7 +350,9 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
               Expanded(
                 child: TextField(
                   controller: _weightController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     hintText: 'Ex : 1.85',
                     border: InputBorder.none,
@@ -383,9 +395,11 @@ class _V2CloseTaskViewState extends State<V2CloseTaskView> {
             Expanded(
               child: ElevatedButton(
                 onPressed: () async {
-                  final parsedWeight = double.tryParse(
-                    _weightController.text.replaceAll(',', '.').trim(),
-                  ) ?? _weightVal;
+                  final parsedWeight =
+                      double.tryParse(
+                        _weightController.text.replaceAll(',', '.').trim(),
+                      ) ??
+                      _weightVal;
                   await widget.onDone({
                     'weight': parsedWeight,
                     'notes': _weighingCommentController.text.trim(),

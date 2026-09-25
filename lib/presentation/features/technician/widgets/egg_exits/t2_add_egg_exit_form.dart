@@ -61,13 +61,17 @@ class _T2AddEggExitFormState extends State<T2AddEggExitForm> {
     final petit = int.tryParse(_petitController.text.trim()) ?? 0;
 
     final sum = plusGros + gros + moyen + petit;
-    if (sum > 0 && _totalQuantityController.text.trim().isEmpty) {
-      _totalQuantityController.text = sum.toString();
-    }
+    setState(() {
+      _totalQuantityController.text = sum > 0 ? sum.toString() : '';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final int totalEggs = int.tryParse(_totalQuantityController.text.trim()) ?? 0;
+    final int platesCount = totalEggs ~/ 30;
+    final int remEggs = totalEggs % 30;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -76,12 +80,45 @@ class _T2AddEggExitFormState extends State<T2AddEggExitForm> {
           const Text('EFFECTUER UNE SORTIE D’ŒUFS', style: AppTypography.label),
           const SizedBox(height: 16),
 
-          // Total quantity
-          AppInputBox(
-            label: 'Nombre d’œufs total',
-            placeholder: 'Ex: 1240',
-            controller: _totalQuantityController,
-            inputType: TextInputType.number,
+          // Total quantity (Calculé automatiquement depuis les calibres)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primaryDark.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TOTAL ŒUFS SORTIS (CALCULÉ AUTOMATIQUEMENT)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryDark,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      totalEggs == 0
+                          ? '0 œuf'
+                          : '$totalEggs œufs (~$platesCount plq${remEggs > 0 ? " + $remEggs" : ""})',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const Icon(Icons.calculate_outlined, color: AppColors.primaryDark, size: 26),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
 

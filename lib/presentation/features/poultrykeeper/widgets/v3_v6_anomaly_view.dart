@@ -21,7 +21,7 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
   String _activeTab = 'mortality'; // mortality, other
 
   // Mortality states
-  int _mortalityCount = 1;
+  int _mortalityCount = 0;
   String _mortalityCause = 'heat'; // heat, disease, unknown
   String _mortalityBuilding = '';
   final TextEditingController _mortalityCommentController =
@@ -58,7 +58,8 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
           setState(() {
             _buildingsList = names;
             if (_buildingsList.isNotEmpty) {
-              if (!_buildingsList.contains(_mortalityBuilding) || _mortalityBuilding.isEmpty) {
+              if (!_buildingsList.contains(_mortalityBuilding) ||
+                  _mortalityBuilding.isEmpty) {
                 _mortalityBuilding = _buildingsList.first;
               }
             } else {
@@ -78,15 +79,6 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
   }
 
   Future<void> _submitMortality() async {
-    if (_mortalityCommentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez ajouter un commentaire explicatif'),
-        ),
-      );
-      return;
-    }
-
     if (_mortalityBuilding.isEmpty && _buildingsList.isNotEmpty) {
       _mortalityBuilding = _buildingsList.first;
     }
@@ -94,7 +86,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
     if (_mortalityBuilding.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Aucun bâtiment disponible pour enregistrer la mortalité.'),
+          content: Text(
+            'Aucun bâtiment disponible pour enregistrer la mortalité.',
+          ),
         ),
       );
       return;
@@ -123,13 +117,16 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
           endpoint: '/volailler/anomalies/mortality',
           method: 'POST',
           payload: payload,
-          description: 'Mortalité: $_mortalityCount sujets ($_mortalityBuilding)',
+          description:
+              'Mortalité: $_mortalityCount sujets ($_mortalityBuilding)',
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: Colors.orange,
-              content: Text('Mortalité enregistrée hors-ligne ! Synchronisation automatique.'),
+              content: Text(
+                'Mortalité enregistrée hors-ligne ! Synchronisation automatique.',
+              ),
             ),
           );
         }
@@ -139,7 +136,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: AppColors.syncGreen,
-              content: Text('Déclaration de mortalité enregistrée avec succès !'),
+              content: Text(
+                'Déclaration de mortalité enregistrée avec succès !',
+              ),
             ),
           );
         }
@@ -159,7 +158,8 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
           endpoint: '/volailler/anomalies/mortality',
           method: 'POST',
           payload: payload,
-          description: 'Mortalité: $_mortalityCount sujets ($_mortalityBuilding)',
+          description:
+              'Mortalité: $_mortalityCount sujets ($_mortalityBuilding)',
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -171,9 +171,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur : $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
         }
       }
     } finally {
@@ -216,7 +216,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: Colors.orange,
-              content: Text('Signalement enregistré hors-ligne ! Synchronisation automatique.'),
+              content: Text(
+                'Signalement enregistré hors-ligne ! Synchronisation automatique.',
+              ),
             ),
           );
         }
@@ -257,9 +259,9 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur : $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
         }
       }
     } finally {
@@ -350,7 +352,7 @@ class _V3V6AnomalyViewState extends State<V3V6AnomalyView> {
         const SizedBox(height: 14),
 
         const Text(
-          'COMMENTAIRE / DÉTAILS (REQUIS)',
+          'COMMENTAIRE / DÉTAILS (OPTIONNEL)',
           style: AppTypography.label,
         ),
         const SizedBox(height: 6),

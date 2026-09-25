@@ -83,16 +83,21 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
 
       for (final item in response.whereType<Map>()) {
         final status = item['status']?.toString() ?? 'pending';
-        final qty = (item['quantity'] as num?)?.toInt() ?? 0;
-        final timeStr = item['date']?.toString().split('T').last.substring(0, 5) ?? '08:00';
+        final announcedQty = (item['announcedCount'] as num?)?.toInt() ??
+            (item['quantity'] as num?)?.toInt() ??
+            0;
+        final verifiedQty =
+            (item['verifiedCount'] as num?)?.toInt() ?? announcedQty;
+        final timeStr =
+            item['date']?.toString().split('T').last.substring(0, 5) ?? '08:00';
 
         final mapItem = {
           'id': item['id']?.toString() ?? '',
           'building': item['building']?.toString() ?? 'A',
           'volailler': item['responsible']?.toString() ?? 'Personnel',
-          'announcedCount': qty,
+          'announcedCount': announcedQty,
           'time': timeStr,
-          'verifiedCount': qty,
+          'verifiedCount': verifiedQty,
           'plusGros': (item['plusGros'] as num?)?.toInt() ?? 0,
           'gros': (item['gros'] as num?)?.toInt() ?? 0,
           'moyen': (item['moyen'] as num?)?.toInt() ?? 0,
@@ -935,6 +940,10 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                             'formatPetit': _formatPetit,
                             'formatMoyen': _formatMoyen,
                             'formatGrand': _formatGros + _formatPlusGros,
+                            'gros': _formatGros,
+                            'plusGros': _formatPlusGros,
+                            'formatGros': _formatGros,
+                            'formatPlusGros': _formatPlusGros,
                             'comment': finalComment,
                           };
 
@@ -968,6 +977,10 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                                 'time': item['time'],
                                 'verifiedCount': countToSave,
                                 'comment': finalComment,
+                                'petit': _formatPetit,
+                                'moyen': _formatMoyen,
+                                'gros': _formatGros,
+                                'plusGros': _formatPlusGros,
                                 'formatPetit': _formatPetit,
                                 'formatMoyen': _formatMoyen,
                                 'formatGrand': _formatGros + _formatPlusGros,
@@ -1003,6 +1016,10 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                               'formatPetit': _formatPetit,
                               'formatMoyen': _formatMoyen,
                               'formatGrand': _formatGros + _formatPlusGros,
+                              'gros': _formatGros,
+                              'plusGros': _formatPlusGros,
+                              'formatGros': _formatGros,
+                              'formatPlusGros': _formatPlusGros,
                               'comment': finalComment,
                             };
                             await _offlineSyncService.enqueueOperation(
@@ -1023,6 +1040,10 @@ class _M3EggReceptionViewState extends State<M3EggReceptionView> {
                                   'time': item['time'],
                                   'verifiedCount': countToSave,
                                   'comment': finalComment,
+                                  'petit': _formatPetit,
+                                  'moyen': _formatMoyen,
+                                  'gros': _formatGros,
+                                  'plusGros': _formatPlusGros,
                                   'formatPetit': _formatPetit,
                                   'formatMoyen': _formatMoyen,
                                   'formatGrand': _formatGros + _formatPlusGros,

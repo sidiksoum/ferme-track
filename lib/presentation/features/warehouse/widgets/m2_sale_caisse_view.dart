@@ -1374,11 +1374,11 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'SÉLECTIONNER LES FORMATS',
+                  'SÉLECTIONNER LES FORMATS (EN ŒUFS)',
                   style: AppTypography.label,
                 ),
                 Text(
-                  'Total : ${_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros} plq (${(_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros) * 30} œufs)',
+                  'Total : ${_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros} œufs (~${(_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros) ~/ 30} plq${(_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros) % 30 > 0 ? " + ${(_qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros) % 30}" : ""})',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -1519,36 +1519,41 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                         _clientNameController.text.trim().isEmpty)
                     ? null
                     : () async {
-                        final int totalQty =
+                        final int totalEggs =
                             _qtyPetit + _qtyMoyen + _qtyGros + _qtyPlusGros;
+                        final double totalPlates = totalEggs / 30.0;
                         final itemsList = [
                           if (_qtyPetit > 0)
                             {
                               'calibre': 'petit',
                               'name': 'Petit format',
                               'quantity': _qtyPetit,
-                              'eggs': _qtyPetit * 30,
+                              'eggs': _qtyPetit,
+                              'plates': _qtyPetit / 30.0,
                             },
                           if (_qtyMoyen > 0)
                             {
                               'calibre': 'moyen',
                               'name': 'Moyen format',
                               'quantity': _qtyMoyen,
-                              'eggs': _qtyMoyen * 30,
+                              'eggs': _qtyMoyen,
+                              'plates': _qtyMoyen / 30.0,
                             },
                           if (_qtyGros > 0)
                             {
                               'calibre': 'gros',
                               'name': 'Gros format',
                               'quantity': _qtyGros,
-                              'eggs': _qtyGros * 30,
+                              'eggs': _qtyGros,
+                              'plates': _qtyGros / 30.0,
                             },
                           if (_qtyPlusGros > 0)
                             {
                               'calibre': 'plusGros',
                               'name': 'Plus Gros format',
                               'quantity': _qtyPlusGros,
-                              'eggs': _qtyPlusGros * 30,
+                              'eggs': _qtyPlusGros,
+                              'plates': _qtyPlusGros / 30.0,
                             },
                         ];
 
@@ -1580,14 +1585,19 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                           'dueDate': _dueDate?.toIso8601String(),
                           'format_petit': _qtyPetit,
                           'qtyPetit': _qtyPetit,
+                          'eggsPetit': _qtyPetit,
                           'format_moyen': _qtyMoyen,
                           'qtyMoyen': _qtyMoyen,
+                          'eggsMoyen': _qtyMoyen,
                           'format_gros': _qtyGros,
                           'qtyGros': _qtyGros,
+                          'eggsGros': _qtyGros,
                           'format_plus_gros': _qtyPlusGros,
                           'qtyPlusGros': _qtyPlusGros,
-                          'quantity_plates': totalQty > 0 ? totalQty : 1,
-                          'quantity': totalQty > 0 ? totalQty : 1,
+                          'eggsPlusGros': _qtyPlusGros,
+                          'quantity_plates': totalPlates > 0 ? totalPlates : 1.0,
+                          'quantity_eggs': totalEggs > 0 ? totalEggs : 30,
+                          'quantity': totalEggs > 0 ? totalEggs : 30,
                           'items': itemsList,
                         };
 
@@ -1604,7 +1614,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                               method: 'POST',
                               payload: saleData,
                               description:
-                                  'Vente: $clientName ($totalQty plq. / $_totalSaleAmount FCFA)',
+                                  'Vente: $clientName ($totalEggs œufs / $_totalSaleAmount FCFA)',
                             );
                             isOfflineQueued = true;
                           } else {
@@ -1619,7 +1629,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                             method: 'POST',
                             payload: saleData,
                             description:
-                                'Vente: $clientName ($totalQty plq. / $_totalSaleAmount FCFA)',
+                                'Vente: $clientName ($totalEggs œufs / $_totalSaleAmount FCFA)',
                           );
                           isOfflineQueued = true;
                         } finally {
@@ -1631,7 +1641,8 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                           }
                         }
 
-                        final displayQty = totalQty > 0 ? totalQty : 1;
+                        final displayEggs = totalEggs > 0 ? totalEggs : 30;
+                        final displayPlates = totalPlates > 0 ? totalPlates : 1.0;
 
                         setState(() {
                           _salesHistory.insert(0, {
@@ -1641,7 +1652,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                             'contact': clientPhone,
                             'address': clientAddress,
                             'details':
-                                '$displayQty plateaux d\'œufs (${displayQty * 30} œufs)',
+                                '$displayEggs œufs (~${displayPlates.toStringAsFixed(1)} plateaux)',
                             'amount': _totalSaleAmount,
                             'paid': paidAmt,
                             'due': _remainingToPay,
@@ -1677,8 +1688,8 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                                   : AppColors.syncGreen,
                               content: Text(
                                 isOfflineQueued
-                                    ? 'Vente enregistrée hors-ligne ($displayQty plq. déstockés localement) !'
-                                    : 'Vente enregistrée avec succès ! ($displayQty plateaux / ${displayQty * 30} œufs déstockés)',
+                                    ? 'Vente enregistrée hors-ligne ($displayEggs œufs déstockés localement) !'
+                                    : 'Vente enregistrée avec succès ! ($displayEggs œufs / ~${displayPlates.toStringAsFixed(1)} plq déstockés)',
                               ),
                             ),
                           );
@@ -1703,7 +1714,13 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
       label,
       () => TextEditingController(text: value.toString()),
     );
-    final int eggCount = value * 30;
+    if (controller.text != value.toString() &&
+        int.tryParse(controller.text) != value) {
+      controller.text = value.toString();
+    }
+    final int platesCount = value ~/ 30;
+    final int remainingEggs = value % 30;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       margin: const EdgeInsets.only(bottom: 8),
@@ -1728,7 +1745,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$value plq. = $eggCount œufs',
+                  '$value œufs (~$platesCount plq${remainingEggs > 0 ? " + $remainingEggs œufs" : ""})',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.inkSoft,
@@ -1741,7 +1758,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
             children: [
               GestureDetector(
                 onTap: () {
-                  final next = (value - 1).clamp(0, 10000);
+                  final next = (value >= 30) ? value - 30 : 0;
                   controller.text = next.toString();
                   controller.selection = TextSelection.collapsed(
                     offset: controller.text.length,
@@ -1768,7 +1785,7 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
               ),
               const SizedBox(width: 8),
               Container(
-                width: 78,
+                width: 82,
                 height: 38,
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -1795,14 +1812,18 @@ class _M2SaleCaisseViewState extends State<M2SaleCaisseView> {
                   ),
                   onChanged: (input) {
                     final parsed = int.tryParse(input);
-                    if (parsed != null && parsed >= 0) onChanged(parsed);
+                    if (parsed != null && parsed >= 0) {
+                      onChanged(parsed);
+                    } else if (input.isEmpty) {
+                      onChanged(0);
+                    }
                   },
                 ),
               ),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
-                  final next = (value + 1).clamp(0, 10000);
+                  final next = (value + 30).clamp(0, 100000);
                   controller.text = next.toString();
                   controller.selection = TextSelection.collapsed(
                     offset: controller.text.length,

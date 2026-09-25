@@ -130,18 +130,28 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
       _staffOptions
         ..clear()
         ..addAll(
-          (responses[2] as List? ?? []).whereType<Map>().map((item) {
-            final role = item['role']?.toString().toUpperCase() == 'POULTRYKEEPER' ? 'Volailler' : 'Technicien';
-            final name = item['full_name'] ?? item['username'] ?? 'Personnel';
-            return {
-              'id': item['id'].toString(),
-              'name': '$name ($role)',
-            };
-          }),
+          (responses[2] as List? ?? [])
+              .whereType<Map>()
+              .where((item) {
+                final r = item['role']?.toString().toUpperCase() ?? '';
+                return r == 'TECHNICIAN' ||
+                    r == 'POULTRYKEEPER' ||
+                    r == 'TECHNICIEN' ||
+                    r == 'VOLAILLER';
+              })
+              .map((item) {
+                final r = item['role']?.toString().toUpperCase() ?? '';
+                final role = (r == 'POULTRYKEEPER' || r == 'VOLAILLER')
+                    ? 'Volailler'
+                    : 'Technicien';
+                final name =
+                    item['full_name'] ?? item['username'] ?? 'Personnel';
+                return {
+                  'id': item['id'].toString(),
+                  'name': '$name ($role)',
+                };
+              }),
         );
-      if (_staffOptions.isEmpty && _responsibleOptions.isNotEmpty) {
-        _staffOptions.addAll(_responsibleOptions);
-      }
 
       // 4. Suppliers
       _existingSuppliers
@@ -319,9 +329,9 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
         existingSuppliers: _existingSuppliers,
         onOrderAdded: () {
           setState(() => _isAddingOrderForm = false);
-          _loadOrders(forceRefresh: true);
           final farmId = context.read<AuthNotifier>().currentUser?.farmId;
-          if (farmId != null) _loadFormOptions(farmId);
+          _loadOrders(farmId: farmId, forceRefresh: true);
+          _loadFormOptions(farmId, forceRefresh: true);
         },
         onCancel: () => setState(() => _isAddingOrderForm = false),
       );
@@ -333,7 +343,8 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
         staffOptions: _staffOptions,
         onExitSaved: () {
           setState(() => _isAddingEggExitForm = false);
-          _loadEggExits(forceRefresh: true);
+          final farmId = context.read<AuthNotifier>().currentUser?.farmId;
+          _loadEggExits(farmId: farmId, forceRefresh: true);
         },
         onCancel: () => setState(() => _isAddingEggExitForm = false),
       );
@@ -363,12 +374,12 @@ class _T2ActivitiesOrdersViewState extends State<T2ActivitiesOrdersView> {
           activities: _activities,
           buildingOptions: _buildingOptions,
           isLoading: _isLoadingActivities,
-          onRefresh: () {
+          onRefresh: () async {
             final farmId = context.read<AuthNotifier>().currentUser?.farmId;
-            if (farmId != null && farmId.isNotEmpty) {
-              _loadFormOptions(farmId);
-            }
-            _loadActivities(forceRefresh: true);
+            await Future.wait([
+              _loadFormOptions(farmId, forceRefresh: true),
+              _loadActivities(farmId: farmId, forceRefresh: true),
+            ]);
           },
         ),
 
